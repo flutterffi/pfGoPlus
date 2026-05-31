@@ -13,6 +13,7 @@ type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Logger   LoggerConfig   `mapstructure:"logger"`
+	Auth     AuthConfig     `mapstructure:"auth"`
 }
 
 type AppConfig struct {
@@ -39,6 +40,14 @@ type LoggerConfig struct {
 	Format string `mapstructure:"format"`
 }
 
+type AuthConfig struct {
+	JWTSecret      string        `mapstructure:"jwt_secret"`
+	JWTIssuer      string        `mapstructure:"jwt_issuer"`
+	AccessTokenTTL time.Duration `mapstructure:"access_token_ttl"`
+	DemoUsername   string        `mapstructure:"demo_username"`
+	DemoPassword   string        `mapstructure:"demo_password"`
+}
+
 func Load() (Config, error) {
 	v := viper.New()
 	v.SetConfigName("config")
@@ -61,6 +70,11 @@ func Load() (Config, error) {
 	v.SetDefault("database.auto_migrate", true)
 	v.SetDefault("logger.level", "info")
 	v.SetDefault("logger.format", "json")
+	v.SetDefault("auth.jwt_secret", "change-me-in-production")
+	v.SetDefault("auth.jwt_issuer", "pfGoPlus")
+	v.SetDefault("auth.access_token_ttl", "2h")
+	v.SetDefault("auth.demo_username", "admin")
+	v.SetDefault("auth.demo_password", "admin123")
 
 	if err := v.ReadInConfig(); err != nil {
 		return Config{}, fmt.Errorf("read config: %w", err)

@@ -1,0 +1,8 @@
+.git
+.gocache
+.gomodcache
+tmp
+bin
+*.db
+*.db-shm
+*.db-wal

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
 	"github.com/flutterffi/pfGoPlus/internal/platform/database"
 	platformlogger "github.com/flutterffi/pfGoPlus/internal/platform/logger"
@@ -45,10 +46,12 @@ func New() (*App, error) {
 		}
 	}
 
+	authService := auth.NewService(cfg.Auth)
+	authHandler := auth.NewHandler(authService)
 	todoRepo := todo.NewRepository(db)
 	todoService := todo.NewService(todoRepo)
-	todoHandler := todo.NewHandler(todoService)
-	router := httpx.NewRouter(log, todoHandler)
+	todoHandler := todo.NewHandler(todoService, auth.RequireAuth(authService))
+	router := httpx.NewRouter(log, authHandler, todoHandler)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

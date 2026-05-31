@@ -9,15 +9,18 @@ import (
 
 type Handler struct {
 	service *Service
+	authz   gin.HandlerFunc
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, authz gin.HandlerFunc) *Handler {
+	return &Handler{service: service, authz: authz}
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.GET("/todos", h.List)
-	group.POST("/todos", h.Create)
+	protected := group.Group("")
+	protected.Use(h.authz)
+	protected.GET("/todos", h.List)
+	protected.POST("/todos", h.Create)
 }
 
 func (h *Handler) List(c *gin.Context) {

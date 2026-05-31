@@ -17,3 +17,10 @@ database:
 logger:
   level: info
   format: json
+
+auth:
+  jwt_secret: change-me-in-production
+  jwt_issuer: pfGoPlus
+  access_token_ttl: 2h
+  demo_username: admin
+  demo_password: admin123
