@@ -8,11 +8,11 @@ import (
 	"go.uber.org/zap"
 )
 
-type RouteRegistrar interface {
-	RegisterRoutes(group *gin.RouterGroup)
+type RouterComposer interface {
+	Compose(router *gin.Engine)
 }
 
-func NewRouter(log *zap.Logger, provider *telemetry.Provider, registrars ...RouteRegistrar) *gin.Engine {
+func NewRouter(log *zap.Logger, provider *telemetry.Provider, composer RouterComposer) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
@@ -22,15 +22,8 @@ func NewRouter(log *zap.Logger, provider *telemetry.Provider, registrars ...Rout
 	router.Use(Recovery())
 	router.Use(ErrorHandler())
 
-	router.GET("/health", func(c *gin.Context) {
-		OK(c, gin.H{
-			"status": "ok",
-		})
-	})
-
-	v1 := router.Group("/api/v1")
-	for _, registrar := range registrars {
-		registrar.RegisterRoutes(v1)
+	if composer != nil {
+		composer.Compose(router)
 	}
 
 	router.NoRoute(func(c *gin.Context) {

@@ -37,7 +37,8 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 		return nil, err
 	}
 	todoHandler := NewTodoHandler(api, authService)
-	engine := NewHTTPRouter(loggerLogger, telemetryProvider, authHandler, todoHandler)
+	edge := NewBFF(configConfig, authHandler, todoHandler)
+	engine := NewHTTPRouter(loggerLogger, telemetryProvider, edge)
 	httpApp := app.NewHTTPApp(configConfig, loggerLogger, gormDB, telemetryProvider, engine, closer)
 	return httpApp, nil
 }

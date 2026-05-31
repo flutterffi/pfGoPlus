@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flutterffi/pfGoPlus/internal/bff"
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
@@ -32,6 +33,35 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	if recorder.Header().Get("X-Otel-Trace-ID") == "" {
 		t.Fatal("expected otel trace id header")
+	}
+}
+
+func TestMetaEndpoint(t *testing.T) {
+	router := newTestRouter(t)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/meta", nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	var response struct {
+		Data struct {
+			App         string `json:"app"`
+			Version     string `json:"version"`
+			TodoBackend string `json:"todo_backend"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal meta response: %v", err)
+	}
+	if response.Data.App != "pfGoPlus-test" {
+		t.Fatalf("unexpected app: %s", response.Data.App)
+	}
+	if response.Data.TodoBackend != "local" {
+		t.Fatalf("unexpected todo_backend: %s", response.Data.TodoBackend)
 	}
 }
 
@@ -74,16 +104,33 @@ func TestCreateTodoEndpoint(t *testing.T) {
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
-	authService := auth.NewService(config.AuthConfig{
-		JWTSecret:      "test-secret",
-		JWTIssuer:      "pfGoPlus-test",
-		AccessTokenTTL: time.Hour,
-		DemoUsername:   "admin",
-		DemoPassword:   "admin123",
-	})
+	cfg := config.Config{
+		App: config.AppConfig{
+			Name: "pfGoPlus-test",
+			Env:  "test",
+		},
+		GRPC: config.GRPCConfig{
+			ClientTarget: "127.0.0.1:9090",
+		},
+		Auth: config.AuthConfig{
+			JWTSecret:      "test-secret",
+			JWTIssuer:      "pfGoPlus-test",
+			AccessTokenTTL: time.Hour,
+			DemoUsername:   "admin",
+			DemoPassword:   "admin123",
+		},
+		Observability: config.ObservabilityConfig{
+			ServiceVersion: "test-version",
+		},
+		TodoBackend: config.TodoBackendConfig{
+			Mode: "local",
+		},
+	}
+	authService := auth.NewService(cfg.Auth)
 	authHandler := auth.NewHandler(authService)
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
-	return httpx.NewRouter(zap.NewNop(), telemetry.NewNoop("pfGoPlus-test"), authHandler, todoHandler)
+	edge := bff.New(cfg, authHandler, todoHandler)
+	return httpx.NewRouter(zap.NewNop(), telemetry.NewNoop("pfGoPlus-test"), edge)
 }
 
 func loginToken(t *testing.T, router http.Handler) string {

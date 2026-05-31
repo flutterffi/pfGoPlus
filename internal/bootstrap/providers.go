@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	todov1 "github.com/flutterffi/pfGoPlus/api/proto/todo/v1"
+	"github.com/flutterffi/pfGoPlus/internal/bff"
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
@@ -83,8 +84,12 @@ func NewTodoAPI(cfg config.Config, log *zap.Logger, service *todo.Service) (todo
 	}
 }
 
-func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, authHandler *auth.Handler, todoHandler *todo.Handler) *gin.Engine {
-	return httpx.NewRouter(log, provider, authHandler, todoHandler)
+func NewBFF(cfg config.Config, authHandler *auth.Handler, todoHandler *todo.Handler) *bff.Edge {
+	return bff.New(cfg, authHandler, todoHandler)
+}
+
+func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, edge *bff.Edge) *gin.Engine {
+	return httpx.NewRouter(log, provider, edge)
 }
 
 func NewGRPCServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.TodoServiceServer) *grpc.Server {
