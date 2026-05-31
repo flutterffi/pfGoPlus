@@ -1,0 +1,19 @@
+app:
+  name: pfGoPlus
+  env: local
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 30s
+
+database:
+  driver: sqlite
+  dsn: ./tmp/pfgo-plus.db
+  auto_migrate: true
+
+logger:
+  level: info
+  format: json
