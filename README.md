@@ -16,6 +16,7 @@
 - working Todo gRPC service scaffold with round-trip tests
 - real `buf`-generated protobuf and gRPC Go stubs
 - BFF-style HTTP edge adapter over Todo contracts
+- OpenTelemetry metrics for HTTP and gRPC request volume, errors, and latency
 
 ## Quick Start
 
@@ -99,10 +100,11 @@ Current milestone:
 - buf-based protobuf generation pipeline
 - switchable Todo backend: local service or gRPC client
 - BFF-style HTTP adapter around Todo API
+- OpenTelemetry metrics pipeline
 
 Next milestone:
 
 - business protobuf contracts
 - generated Wire bootstrap
-- OpenTelemetry metrics exporter
 - grpc-gateway or BFF-style edge transport
+- production exporter targets such as OTLP/Prometheus

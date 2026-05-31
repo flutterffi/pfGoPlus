@@ -30,6 +30,7 @@ The repository now includes the first microservice-ready step:
 - `internal/bootstrap/` for Wire-style dependency assembly
 - `api/proto/todo/v1/` for the Todo service contract
 - `internal/modules/todo/grpc_service.go` for business RPC implementation
+- request metrics for HTTP and gRPC latency/error visibility
 
 ## Folder Strategy
 

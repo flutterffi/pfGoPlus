@@ -16,11 +16,16 @@ import (
 )
 
 func NewServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.TodoServiceServer) *grpc.Server {
+	metrics, err := telemetry.NewGRPCMetrics(provider)
+	if err != nil {
+		panic(err)
+	}
+
 	server := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler(
 			otelgrpc.WithTracerProvider(provider.TracerProvider()),
 		)),
-		grpc.ChainUnaryInterceptor(LoggingUnaryInterceptor(log)),
+		grpc.ChainUnaryInterceptor(LoggingUnaryInterceptor(log, metrics)),
 	)
 
 	healthServer := health.NewServer()
@@ -32,7 +37,7 @@ func NewServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.
 	return server
 }
 
-func LoggingUnaryInterceptor(log *zap.Logger) grpc.UnaryServerInterceptor {
+func LoggingUnaryInterceptor(log *zap.Logger, metrics *telemetry.GRPCMetrics) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req interface{},
@@ -54,11 +59,13 @@ func LoggingUnaryInterceptor(log *zap.Logger) grpc.UnaryServerInterceptor {
 			)
 		}
 		if err != nil {
+			metrics.Record(ctx, info.FullMethod, true, time.Since(start))
 			fields = append(fields, zap.Error(err))
 			log.Error("grpc request failed", fields...)
 			return resp, err
 		}
 
+		metrics.Record(ctx, info.FullMethod, false, time.Since(start))
 		log.Info("grpc request completed", fields...)
 		return resp, nil
 	}
