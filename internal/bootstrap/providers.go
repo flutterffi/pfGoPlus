@@ -84,8 +84,8 @@ func NewTodoAPI(cfg config.Config, log *zap.Logger, service *todo.Service) (todo
 	}
 }
 
-func NewBFF(cfg config.Config, authHandler *auth.Handler, todoHandler *todo.Handler) *bff.Edge {
-	return bff.New(cfg, authHandler, todoHandler)
+func NewBFF(cfg config.Config, authHandler *auth.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *bff.Edge {
+	return bff.New(cfg, authHandler, todoHandler, telemetryProvider)
 }
 
 func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, edge *bff.Edge) *gin.Engine {

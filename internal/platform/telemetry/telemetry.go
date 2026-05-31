@@ -3,10 +3,13 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
+	promexporter "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/metric"
@@ -24,6 +27,7 @@ type Provider struct {
 	meterProvider  *sdkmetric.MeterProvider
 	propagator     propagation.TextMapPropagator
 	serviceName    string
+	metricsHandler http.Handler
 }
 
 func New(cfg config.ObservabilityConfig, serviceName, env string, log *zap.Logger) (*Provider, error) {
@@ -31,7 +35,7 @@ func New(cfg config.ObservabilityConfig, serviceName, env string, log *zap.Logge
 		return NewNoop(serviceName), nil
 	}
 
-	traceExporter, metricExporter, err := newExporters(cfg.Exporter)
+	traceExporter, metricReader, metricsHandler, err := newExporters(cfg.Exporter)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +57,7 @@ func New(cfg config.ObservabilityConfig, serviceName, env string, log *zap.Logge
 		sdktrace.WithResource(res),
 	)
 	meterProvider := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
+		sdkmetric.WithReader(metricReader),
 		sdkmetric.WithResource(res),
 	)
 
@@ -76,6 +80,7 @@ func New(cfg config.ObservabilityConfig, serviceName, env string, log *zap.Logge
 		meterProvider:  meterProvider,
 		propagator:     propagator,
 		serviceName:    serviceName,
+		metricsHandler: metricsHandler,
 	}, nil
 }
 
@@ -111,6 +116,10 @@ func (p *Provider) Propagator() propagation.TextMapPropagator {
 	return p.propagator
 }
 
+func (p *Provider) MetricsHandler() http.Handler {
+	return p.metricsHandler
+}
+
 func (p *Provider) Shutdown(ctx context.Context) error {
 	if err := p.meterProvider.Shutdown(ctx); err != nil {
 		return err
@@ -118,19 +127,29 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 	return p.tracerProvider.Shutdown(ctx)
 }
 
-func newExporters(name string) (sdktrace.SpanExporter, sdkmetric.Exporter, error) {
+func newExporters(name string) (sdktrace.SpanExporter, sdkmetric.Reader, http.Handler, error) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "", "stdout":
 		traceExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 		if err != nil {
-			return nil, nil, fmt.Errorf("create stdout trace exporter: %w", err)
+			return nil, nil, nil, fmt.Errorf("create stdout trace exporter: %w", err)
 		}
 		metricExporter, err := stdoutmetric.New(stdoutmetric.WithPrettyPrint())
 		if err != nil {
-			return nil, nil, fmt.Errorf("create stdout metric exporter: %w", err)
+			return nil, nil, nil, fmt.Errorf("create stdout metric exporter: %w", err)
 		}
-		return traceExporter, metricExporter, nil
+		return traceExporter, sdkmetric.NewPeriodicReader(metricExporter), nil, nil
+	case "prometheus":
+		traceExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("create stdout trace exporter: %w", err)
+		}
+		exporter, err := promexporter.New()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("create prometheus exporter: %w", err)
+		}
+		return traceExporter, exporter, promhttp.Handler(), nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported telemetry exporter: %s", name)
+		return nil, nil, nil, fmt.Errorf("unsupported telemetry exporter: %s", name)
 	}
 }

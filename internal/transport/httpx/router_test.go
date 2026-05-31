@@ -65,6 +65,18 @@ func TestMetaEndpoint(t *testing.T) {
 	}
 }
 
+func TestMetricsEndpointUnavailableInStdoutMode(t *testing.T) {
+	router := newTestRouter(t)
+
+	request := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", recorder.Code)
+	}
+}
+
 func TestProtectedTodoEndpointRequiresAuth(t *testing.T) {
 	router := newTestRouter(t)
 
@@ -120,6 +132,8 @@ func newTestRouter(t *testing.T) http.Handler {
 			DemoPassword:   "admin123",
 		},
 		Observability: config.ObservabilityConfig{
+			Exporter:       "stdout",
+			MetricsPath:    "/metrics",
 			ServiceVersion: "test-version",
 		},
 		TodoBackend: config.TodoBackendConfig{
@@ -129,8 +143,9 @@ func newTestRouter(t *testing.T) http.Handler {
 	authService := auth.NewService(cfg.Auth)
 	authHandler := auth.NewHandler(authService)
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
-	edge := bff.New(cfg, authHandler, todoHandler)
-	return httpx.NewRouter(zap.NewNop(), telemetry.NewNoop("pfGoPlus-test"), edge)
+	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
+	edge := bff.New(cfg, authHandler, todoHandler, telemetryProvider)
+	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
 }
 
 func loginToken(t *testing.T, router http.Handler) string {

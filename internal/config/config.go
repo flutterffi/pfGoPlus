@@ -60,6 +60,7 @@ type AuthConfig struct {
 type ObservabilityConfig struct {
 	Enabled        bool   `mapstructure:"enabled"`
 	Exporter       string `mapstructure:"exporter"`
+	MetricsPath    string `mapstructure:"metrics_path"`
 	ServiceVersion string `mapstructure:"service_version"`
 }
 
@@ -99,6 +100,7 @@ func Load() (Config, error) {
 	v.SetDefault("auth.demo_password", "admin123")
 	v.SetDefault("observability.enabled", true)
 	v.SetDefault("observability.exporter", "stdout")
+	v.SetDefault("observability.metrics_path", "/metrics")
 	v.SetDefault("observability.service_version", "v0.3.0")
 	v.SetDefault("todo_backend.mode", "local")
 

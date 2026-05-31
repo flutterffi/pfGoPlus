@@ -17,6 +17,7 @@
 - real `buf`-generated protobuf and gRPC Go stubs
 - BFF-style HTTP edge adapter over Todo contracts
 - OpenTelemetry metrics for HTTP and gRPC request volume, errors, and latency
+- optional Prometheus metrics endpoint for runtime scraping
 
 ## Quick Start
 
@@ -32,6 +33,14 @@ Switch HTTP to gRPC-backed Todo mode:
 ```bash
 PFGO_TODO_BACKEND_MODE=grpc \
 PFGO_GRPC_CLIENT_TARGET=127.0.0.1:9090 \
+make run
+```
+
+Expose Prometheus metrics:
+
+```bash
+PFGO_OBSERVABILITY_EXPORTER=prometheus \
+PFGO_OBSERVABILITY_METRICS_PATH=/metrics \
 make run
 ```
 
@@ -101,6 +110,7 @@ Current milestone:
 - switchable Todo backend: local service or gRPC client
 - BFF-style HTTP adapter around Todo API
 - OpenTelemetry metrics pipeline
+- Prometheus scraping mode via `/metrics`
 
 Next milestone:
 
