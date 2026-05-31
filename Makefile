@@ -3,9 +3,10 @@ SHELL := /bin/zsh
 GO ?= go
 GOCACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.gocache
 GOMODCACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.gomodcache
+BUF_CACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.bufcache
 GO_RUN = GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) $(GO)
 
-.PHONY: run run-grpc test tidy
+.PHONY: run run-grpc test tidy proto
 
 run:
 	$(GO_RUN) run ./cmd/server
@@ -18,3 +19,6 @@ test:
 
 tidy:
 	$(GO_RUN) mod tidy
+
+proto:
+	BUF_CACHE_DIR=$(BUF_CACHE_DIR) ./bin/buf generate

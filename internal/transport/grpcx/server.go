@@ -21,7 +21,6 @@ func NewServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.
 			otelgrpc.WithTracerProvider(provider.TracerProvider()),
 		)),
 		grpc.ChainUnaryInterceptor(LoggingUnaryInterceptor(log)),
-		grpc.ForceServerCodec(JSONCodec{}),
 	)
 
 	healthServer := health.NewServer()

@@ -14,11 +14,13 @@
 - OpenTelemetry tracing on HTTP and gRPC
 - Wire-style dependency assembly for HTTP and gRPC entrypoints
 - working Todo gRPC service scaffold with round-trip tests
+- real `buf`-generated protobuf and gRPC Go stubs
 
 ## Quick Start
 
 ```bash
 make tidy
+make proto
 make run
 go run ./cmd/grpcserver
 ```
@@ -65,7 +67,7 @@ pfGoPlus/
   internal/platform/          # database, logger, telemetry
   internal/transport/httpx/   # HTTP transport and middleware
   internal/transport/grpcx/   # gRPC server and interceptors
-  api/proto/todo/v1/          # service contract and Go-side grpc scaffolding
+  api/proto/todo/v1/          # proto contract and generated Go stubs
   docs/architecture.md        # microservice evolution notes
   Dockerfile                  # container image build
   .github/workflows/go.yml    # CI smoke test
@@ -85,10 +87,11 @@ Current milestone:
 - gRPC health server scaffold
 - Wire-style dependency assembly
 - Todo gRPC service implementation and tests
+- buf-based protobuf generation pipeline
 
 Next milestone:
 
 - business protobuf contracts
-- generated protobuf stubs via protoc or buf
 - generated Wire bootstrap
 - OpenTelemetry metrics exporter
+- grpc-gateway or BFF-style edge transport

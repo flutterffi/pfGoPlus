@@ -32,7 +32,6 @@ func TestHealthCheck(t *testing.T) {
 			return listener.Dial()
 		}),
 		grpc.WithInsecure(),
-		grpc.WithDefaultCallOptions(grpc.ForceCodec(JSONCodec{})),
 	)
 	if err != nil {
 		t.Fatalf("create grpc client: %v", err)
@@ -67,7 +66,6 @@ func TestTodoServiceRoundTrip(t *testing.T) {
 			return listener.Dial()
 		}),
 		grpc.WithInsecure(),
-		grpc.WithDefaultCallOptions(grpc.ForceCodec(JSONCodec{})),
 	)
 	if err != nil {
 		t.Fatalf("create grpc client: %v", err)

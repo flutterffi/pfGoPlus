@@ -44,7 +44,7 @@ func (s *GRPCService) CreateTodo(ctx context.Context, req *todov1.CreateTodoRequ
 
 func mapTodo(item Todo) *todov1.Todo {
 	return &todov1.Todo{
-		ID:          uint64(item.ID),
+		Id:          uint64(item.ID),
 		Title:       item.Title,
 		Description: item.Description,
 		Status:      item.Status,

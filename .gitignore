@@ -1,6 +1,7 @@
 .DS_Store
 .gocache/
 .gomodcache/
+.bufcache/
 bin/
 tmp/
 *.db
