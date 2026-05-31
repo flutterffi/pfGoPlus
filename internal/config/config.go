@@ -16,6 +16,7 @@ type Config struct {
 	Logger        LoggerConfig        `mapstructure:"logger"`
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Observability ObservabilityConfig `mapstructure:"observability"`
+	TodoBackend   TodoBackendConfig   `mapstructure:"todo_backend"`
 }
 
 type AppConfig struct {
@@ -32,8 +33,9 @@ type HTTPConfig struct {
 }
 
 type GRPCConfig struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	ClientTarget string `mapstructure:"client_target"`
 }
 
 type DatabaseConfig struct {
@@ -61,6 +63,10 @@ type ObservabilityConfig struct {
 	ServiceVersion string `mapstructure:"service_version"`
 }
 
+type TodoBackendConfig struct {
+	Mode string `mapstructure:"mode"`
+}
+
 func Load() (Config, error) {
 	v := viper.New()
 	v.SetConfigName("config")
@@ -80,6 +86,7 @@ func Load() (Config, error) {
 	v.SetDefault("http.idle_timeout", "30s")
 	v.SetDefault("grpc.host", "0.0.0.0")
 	v.SetDefault("grpc.port", 9090)
+	v.SetDefault("grpc.client_target", "127.0.0.1:9090")
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.dsn", "./tmp/pfgo-plus.db")
 	v.SetDefault("database.auto_migrate", true)
@@ -93,6 +100,7 @@ func Load() (Config, error) {
 	v.SetDefault("observability.enabled", true)
 	v.SetDefault("observability.exporter", "stdout")
 	v.SetDefault("observability.service_version", "v0.3.0")
+	v.SetDefault("todo_backend.mode", "local")
 
 	if err := v.ReadInConfig(); err != nil {
 		return Config{}, fmt.Errorf("read config: %w", err)

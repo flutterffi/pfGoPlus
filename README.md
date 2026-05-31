@@ -25,6 +25,14 @@ make run
 go run ./cmd/grpcserver
 ```
 
+Switch HTTP to gRPC-backed Todo mode:
+
+```bash
+PFGO_TODO_BACKEND_MODE=grpc \
+PFGO_GRPC_CLIENT_TARGET=127.0.0.1:9090 \
+make run
+```
+
 Open:
 
 - `GET /health`
@@ -88,6 +96,7 @@ Current milestone:
 - Wire-style dependency assembly
 - Todo gRPC service implementation and tests
 - buf-based protobuf generation pipeline
+- switchable Todo backend: local service or gRPC client
 
 Next milestone:
 

@@ -8,11 +8,11 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service API
 	authz   gin.HandlerFunc
 }
 
-func NewHandler(service *Service, authz gin.HandlerFunc) *Handler {
+func NewHandler(service API, authz gin.HandlerFunc) *Handler {
 	return &Handler{service: service, authz: authz}
 }
 

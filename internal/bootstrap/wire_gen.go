@@ -32,11 +32,13 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 	authHandler := NewAuthHandler(authService)
 	gormRepository := NewTodoRepository(gormDB)
 	service := NewTodoService(gormRepository)
-	todoServiceServer := NewTodoGRPCService(service)
-	todoHandler := NewTodoHandler(service, authService)
+	api, closer, err := NewTodoAPI(configConfig, loggerLogger, service)
+	if err != nil {
+		return nil, err
+	}
+	todoHandler := NewTodoHandler(api, authService)
 	engine := NewHTTPRouter(loggerLogger, telemetryProvider, authHandler, todoHandler)
-	httpApp := app.NewHTTPApp(configConfig, loggerLogger, gormDB, telemetryProvider, engine)
-	_ = todoServiceServer
+	httpApp := app.NewHTTPApp(configConfig, loggerLogger, gormDB, telemetryProvider, engine, closer)
 	return httpApp, nil
 }
 

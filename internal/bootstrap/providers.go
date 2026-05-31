@@ -1,7 +1,10 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"strings"
 
 	todov1 "github.com/flutterffi/pfGoPlus/api/proto/todo/v1"
 	"github.com/flutterffi/pfGoPlus/internal/config"
@@ -56,12 +59,28 @@ func NewTodoService(repo todo.Repository) *todo.Service {
 	return todo.NewService(repo)
 }
 
-func NewTodoHandler(service *todo.Service, authService *auth.Service) *todo.Handler {
+func NewTodoHandler(service todo.API, authService *auth.Service) *todo.Handler {
 	return todo.NewHandler(service, auth.RequireAuth(authService))
 }
 
 func NewTodoGRPCService(service *todo.Service) todov1.TodoServiceServer {
 	return todo.NewGRPCService(service)
+}
+
+func NewTodoAPI(cfg config.Config, log *zap.Logger, service *todo.Service) (todo.API, io.Closer, error) {
+	switch strings.ToLower(strings.TrimSpace(cfg.TodoBackend.Mode)) {
+	case "", "local":
+		return service, nil, nil
+	case "grpc":
+		conn, err := grpcx.Dial(context.Background(), cfg.GRPC.ClientTarget)
+		if err != nil {
+			return nil, nil, err
+		}
+		log.Info("todo backend uses grpc client", zap.String("target", cfg.GRPC.ClientTarget))
+		return todo.NewGRPCClient(conn), conn, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported todo backend mode: %s", cfg.TodoBackend.Mode)
+	}
 }
 
 func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, authHandler *auth.Handler, todoHandler *todo.Handler) *gin.Engine {

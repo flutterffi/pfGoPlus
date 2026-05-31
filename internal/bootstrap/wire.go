@@ -19,6 +19,7 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 		NewAuthHandler,
 		NewTodoRepository,
 		NewTodoService,
+		NewTodoAPI,
 		NewTodoGRPCService,
 		NewTodoHandler,
 		NewHTTPRouter,

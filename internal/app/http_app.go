@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -19,9 +20,10 @@ type HTTPApp struct {
 	db        *gorm.DB
 	server    *http.Server
 	telemetry *telemetry.Provider
+	closers   []io.Closer
 }
 
-func NewHTTPApp(cfg config.Config, logger *zap.Logger, db *gorm.DB, telemetryProvider *telemetry.Provider, handler http.Handler) *HTTPApp {
+func NewHTTPApp(cfg config.Config, logger *zap.Logger, db *gorm.DB, telemetryProvider *telemetry.Provider, handler http.Handler, closers ...io.Closer) *HTTPApp {
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port),
 		Handler:           handler,
@@ -37,6 +39,7 @@ func NewHTTPApp(cfg config.Config, logger *zap.Logger, db *gorm.DB, telemetryPro
 		db:        db,
 		server:    server,
 		telemetry: telemetryProvider,
+		closers:   closers,
 	}
 }
 
@@ -76,6 +79,14 @@ func (a *HTTPApp) cleanup(ctx context.Context) error {
 	if a.telemetry != nil {
 		if err := a.telemetry.Shutdown(ctx); err != nil {
 			return fmt.Errorf("shutdown telemetry: %w", err)
+		}
+	}
+	for _, closer := range a.closers {
+		if closer == nil {
+			continue
+		}
+		if err := closer.Close(); err != nil {
+			return fmt.Errorf("close dependency: %w", err)
 		}
 	}
 	a.logger.Info("application stopped")

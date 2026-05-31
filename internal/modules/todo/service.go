@@ -7,6 +7,11 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 )
 
+type API interface {
+	Create(ctx context.Context, req CreateRequest) (*Todo, error)
+	List(ctx context.Context) ([]Todo, error)
+}
+
 type Service struct {
 	repo Repository
 }
