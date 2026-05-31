@@ -8,12 +8,12 @@ import (
 )
 
 type Handler struct {
-	service API
-	authz   gin.HandlerFunc
+	edge  HTTPEdge
+	authz gin.HandlerFunc
 }
 
-func NewHandler(service API, authz gin.HandlerFunc) *Handler {
-	return &Handler{service: service, authz: authz}
+func NewHandler(edge HTTPEdge, authz gin.HandlerFunc) *Handler {
+	return &Handler{edge: edge, authz: authz}
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
@@ -24,26 +24,26 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	items, err := h.service.List(c.Request.Context())
+	response, err := h.edge.List(c.Request.Context())
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	httpx.OK(c, gin.H{"items": items})
+	httpx.OK(c, response)
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	var req CreateRequest
+	var req CreateHTTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		_ = c.Error(httpx.BadRequest("invalid request body", err))
 		return
 	}
 
-	item, err := h.service.Create(c.Request.Context(), req)
+	response, err := h.edge.Create(c.Request.Context(), req)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	httpx.Success(c, http.StatusCreated, "todo created", gin.H{"item": item})
+	httpx.Success(c, http.StatusCreated, "todo created", response)
 }

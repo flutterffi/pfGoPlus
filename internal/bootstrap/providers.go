@@ -60,7 +60,7 @@ func NewTodoService(repo todo.Repository) *todo.Service {
 }
 
 func NewTodoHandler(service todo.API, authService *auth.Service) *todo.Handler {
-	return todo.NewHandler(service, auth.RequireAuth(authService))
+	return todo.NewHandler(todo.NewHTTPAdapter(service), auth.RequireAuth(authService))
 }
 
 func NewTodoGRPCService(service *todo.Service) todov1.TodoServiceServer {

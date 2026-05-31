@@ -15,6 +15,7 @@
 - Wire-style dependency assembly for HTTP and gRPC entrypoints
 - working Todo gRPC service scaffold with round-trip tests
 - real `buf`-generated protobuf and gRPC Go stubs
+- BFF-style HTTP edge adapter over Todo contracts
 
 ## Quick Start
 
@@ -97,6 +98,7 @@ Current milestone:
 - Todo gRPC service implementation and tests
 - buf-based protobuf generation pipeline
 - switchable Todo backend: local service or gRPC client
+- BFF-style HTTP adapter around Todo API
 
 Next milestone:
 

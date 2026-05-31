@@ -82,7 +82,7 @@ func newTestRouter(t *testing.T) http.Handler {
 		DemoPassword:   "admin123",
 	})
 	authHandler := auth.NewHandler(authService)
-	todoHandler := todo.NewHandler(todo.NewService(&fakeTodoRepo{}), auth.RequireAuth(authService))
+	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	return httpx.NewRouter(zap.NewNop(), telemetry.NewNoop("pfGoPlus-test"), authHandler, todoHandler)
 }
 
