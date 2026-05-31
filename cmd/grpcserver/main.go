@@ -13,12 +13,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	application, err := bootstrap.InitializeHTTPApp()
+	application, err := bootstrap.InitializeGRPCApp()
 	if err != nil {
-		log.Fatalf("bootstrap application: %v", err)
+		log.Fatalf("bootstrap grpc application: %v", err)
 	}
 
 	if err := application.Run(ctx); err != nil {
-		log.Fatalf("run application: %v", err)
+		log.Fatalf("run grpc application: %v", err)
 	}
 }

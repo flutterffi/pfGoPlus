@@ -5,10 +5,13 @@ GOCACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.gocache
 GOMODCACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.gomodcache
 GO_RUN = GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) $(GO)
 
-.PHONY: run test tidy
+.PHONY: run run-grpc test tidy
 
 run:
 	$(GO_RUN) run ./cmd/server
+
+run-grpc:
+	$(GO_RUN) run ./cmd/grpcserver
 
 test:
 	$(GO_RUN) test ./...

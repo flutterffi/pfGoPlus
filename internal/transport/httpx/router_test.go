@@ -12,6 +12,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
+	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"go.uber.org/zap"
 )
@@ -28,6 +29,9 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	if recorder.Header().Get("X-Trace-ID") == "" {
 		t.Fatal("expected trace id header")
+	}
+	if recorder.Header().Get("X-Otel-Trace-ID") == "" {
+		t.Fatal("expected otel trace id header")
 	}
 }
 
@@ -79,7 +83,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	})
 	authHandler := auth.NewHandler(authService)
 	todoHandler := todo.NewHandler(todo.NewService(&fakeTodoRepo{}), auth.RequireAuth(authService))
-	return httpx.NewRouter(zap.NewNop(), authHandler, todoHandler)
+	return httpx.NewRouter(zap.NewNop(), telemetry.NewNoop("pfGoPlus-test"), authHandler, todoHandler)
 }
 
 func loginToken(t *testing.T, router http.Handler) string {

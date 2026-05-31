@@ -3,6 +3,7 @@ package httpx
 import (
 	"net/http"
 
+	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -11,11 +12,12 @@ type RouteRegistrar interface {
 	RegisterRoutes(group *gin.RouterGroup)
 }
 
-func NewRouter(log *zap.Logger, registrars ...RouteRegistrar) *gin.Engine {
+func NewRouter(log *zap.Logger, provider *telemetry.Provider, registrars ...RouteRegistrar) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
 	router.Use(Trace(log))
+	router.Use(Telemetry(provider))
 	router.Use(RequestLogger())
 	router.Use(Recovery())
 	router.Use(ErrorHandler())

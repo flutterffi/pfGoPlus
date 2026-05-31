@@ -9,11 +9,13 @@ import (
 )
 
 type Config struct {
-	App      AppConfig      `mapstructure:"app"`
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Logger   LoggerConfig   `mapstructure:"logger"`
-	Auth     AuthConfig     `mapstructure:"auth"`
+	App           AppConfig           `mapstructure:"app"`
+	HTTP          HTTPConfig          `mapstructure:"http"`
+	GRPC          GRPCConfig          `mapstructure:"grpc"`
+	Database      DatabaseConfig      `mapstructure:"database"`
+	Logger        LoggerConfig        `mapstructure:"logger"`
+	Auth          AuthConfig          `mapstructure:"auth"`
+	Observability ObservabilityConfig `mapstructure:"observability"`
 }
 
 type AppConfig struct {
@@ -21,12 +23,17 @@ type AppConfig struct {
 	Env  string `mapstructure:"env"`
 }
 
-type ServerConfig struct {
+type HTTPConfig struct {
 	Host         string        `mapstructure:"host"`
 	Port         int           `mapstructure:"port"`
 	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `mapstructure:"write_timeout"`
 	IdleTimeout  time.Duration `mapstructure:"idle_timeout"`
+}
+
+type GRPCConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 type DatabaseConfig struct {
@@ -48,6 +55,12 @@ type AuthConfig struct {
 	DemoPassword   string        `mapstructure:"demo_password"`
 }
 
+type ObservabilityConfig struct {
+	Enabled        bool   `mapstructure:"enabled"`
+	Exporter       string `mapstructure:"exporter"`
+	ServiceVersion string `mapstructure:"service_version"`
+}
+
 func Load() (Config, error) {
 	v := viper.New()
 	v.SetConfigName("config")
@@ -60,11 +73,13 @@ func Load() (Config, error) {
 
 	v.SetDefault("app.name", "pfGoPlus")
 	v.SetDefault("app.env", "local")
-	v.SetDefault("server.host", "0.0.0.0")
-	v.SetDefault("server.port", 8080)
-	v.SetDefault("server.read_timeout", "5s")
-	v.SetDefault("server.write_timeout", "10s")
-	v.SetDefault("server.idle_timeout", "30s")
+	v.SetDefault("http.host", "0.0.0.0")
+	v.SetDefault("http.port", 8080)
+	v.SetDefault("http.read_timeout", "5s")
+	v.SetDefault("http.write_timeout", "10s")
+	v.SetDefault("http.idle_timeout", "30s")
+	v.SetDefault("grpc.host", "0.0.0.0")
+	v.SetDefault("grpc.port", 9090)
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.dsn", "./tmp/pfgo-plus.db")
 	v.SetDefault("database.auto_migrate", true)
@@ -75,6 +90,9 @@ func Load() (Config, error) {
 	v.SetDefault("auth.access_token_ttl", "2h")
 	v.SetDefault("auth.demo_username", "admin")
 	v.SetDefault("auth.demo_password", "admin123")
+	v.SetDefault("observability.enabled", true)
+	v.SetDefault("observability.exporter", "stdout")
+	v.SetDefault("observability.service_version", "v0.3.0")
 
 	if err := v.ReadInConfig(); err != nil {
 		return Config{}, fmt.Errorf("read config: %w", err)

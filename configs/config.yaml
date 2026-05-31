@@ -2,12 +2,16 @@ app:
   name: pfGoPlus
   env: local
 
-server:
+http:
   host: 0.0.0.0
   port: 8080
   read_timeout: 5s
   write_timeout: 10s
   idle_timeout: 30s
+
+grpc:
+  host: 0.0.0.0
+  port: 9090
 
 database:
   driver: sqlite
@@ -24,3 +28,8 @@ auth:
   access_token_ttl: 2h
   demo_username: admin
   demo_password: admin123
+
+observability:
+  enabled: true
+  exporter: stdout
+  service_version: v0.3.0

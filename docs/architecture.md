@@ -20,9 +20,29 @@ When the service boundary becomes stable, evolve with:
 - Wire for dependency graph assembly
 - OpenTelemetry for tracing and metrics
 
-The current folder split already leaves room for this path:
+## Current Progress
+
+The repository now includes the first microservice-ready step:
+
+- `cmd/grpcserver/` for a standalone gRPC process
+- `internal/transport/grpcx/` for server setup and interceptors
+- `internal/platform/telemetry/` for OpenTelemetry bootstrap
+- `internal/bootstrap/` for Wire-style dependency assembly
+
+## Folder Strategy
+
+The current folder split leaves room for deeper service extraction later:
 
 - `cmd/` for app entrypoints
 - `internal/modules/` for business modules
 - `internal/platform/` for infrastructure adapters
 - `internal/transport/` for HTTP today and gRPC tomorrow
+
+## Next Step
+
+When a business module is ready to cross process boundaries, the next change should be:
+
+- define a real protobuf contract under `api/proto/`
+- generate gRPC stubs
+- move one module behind the new contract
+- emit spans and metrics to a real collector instead of stdout
