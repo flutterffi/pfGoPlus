@@ -13,6 +13,7 @@
 - Docker and GitHub Actions delivery basics
 - OpenTelemetry tracing on HTTP and gRPC
 - Wire-style dependency assembly for HTTP and gRPC entrypoints
+- working Todo gRPC service scaffold with round-trip tests
 
 ## Quick Start
 
@@ -29,6 +30,7 @@ Open:
 - `GET /api/v1/todos` (requires Bearer token)
 - `POST /api/v1/todos` (requires Bearer token)
 - gRPC health service on `:9090`
+- gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 
 Example request:
 
@@ -63,6 +65,7 @@ pfGoPlus/
   internal/platform/          # database, logger, telemetry
   internal/transport/httpx/   # HTTP transport and middleware
   internal/transport/grpcx/   # gRPC server and interceptors
+  api/proto/todo/v1/          # service contract and Go-side grpc scaffolding
   docs/architecture.md        # microservice evolution notes
   Dockerfile                  # container image build
   .github/workflows/go.yml    # CI smoke test
@@ -81,9 +84,11 @@ Current milestone:
 - OpenTelemetry trace propagation
 - gRPC health server scaffold
 - Wire-style dependency assembly
+- Todo gRPC service implementation and tests
 
 Next milestone:
 
 - business protobuf contracts
+- generated protobuf stubs via protoc or buf
 - generated Wire bootstrap
 - OpenTelemetry metrics exporter

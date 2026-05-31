@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 
+	todov1 "github.com/flutterffi/pfGoPlus/api/proto/todo/v1"
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
@@ -59,10 +60,14 @@ func NewTodoHandler(service *todo.Service, authService *auth.Service) *todo.Hand
 	return todo.NewHandler(service, auth.RequireAuth(authService))
 }
 
+func NewTodoGRPCService(service *todo.Service) todov1.TodoServiceServer {
+	return todo.NewGRPCService(service)
+}
+
 func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, authHandler *auth.Handler, todoHandler *todo.Handler) *gin.Engine {
 	return httpx.NewRouter(log, provider, authHandler, todoHandler)
 }
 
-func NewGRPCServer(log *zap.Logger, provider *telemetry.Provider) *grpc.Server {
-	return grpcx.NewServer(log, provider)
+func NewGRPCServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.TodoServiceServer) *grpc.Server {
+	return grpcx.NewServer(log, provider, todoServer)
 }

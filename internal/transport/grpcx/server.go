@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	todov1 "github.com/flutterffi/pfGoPlus/api/proto/todo/v1"
 	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
@@ -14,17 +15,19 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func NewServer(log *zap.Logger, provider *telemetry.Provider) *grpc.Server {
+func NewServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.TodoServiceServer) *grpc.Server {
 	server := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler(
 			otelgrpc.WithTracerProvider(provider.TracerProvider()),
 		)),
 		grpc.ChainUnaryInterceptor(LoggingUnaryInterceptor(log)),
+		grpc.ForceServerCodec(JSONCodec{}),
 	)
 
 	healthServer := health.NewServer()
 	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(server, healthServer)
+	todov1.RegisterTodoServiceServer(server, todoServer)
 	reflection.Register(server)
 
 	return server

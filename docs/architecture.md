@@ -28,6 +28,8 @@ The repository now includes the first microservice-ready step:
 - `internal/transport/grpcx/` for server setup and interceptors
 - `internal/platform/telemetry/` for OpenTelemetry bootstrap
 - `internal/bootstrap/` for Wire-style dependency assembly
+- `api/proto/todo/v1/` for the Todo service contract
+- `internal/modules/todo/grpc_service.go` for business RPC implementation
 
 ## Folder Strategy
 
@@ -43,6 +45,6 @@ The current folder split leaves room for deeper service extraction later:
 When a business module is ready to cross process boundaries, the next change should be:
 
 - define a real protobuf contract under `api/proto/`
-- generate gRPC stubs
+- generate protobuf and gRPC stubs from the proto file
 - move one module behind the new contract
 - emit spans and metrics to a real collector instead of stdout

@@ -19,6 +19,7 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 		NewAuthHandler,
 		NewTodoRepository,
 		NewTodoService,
+		NewTodoGRPCService,
 		NewTodoHandler,
 		NewHTTPRouter,
 		app.NewHTTPApp,
@@ -33,6 +34,9 @@ func InitializeGRPCApp() (*app.GRPCApp, error) {
 		NewDatabase,
 		NewTelemetry,
 		MigrateDatabase,
+		NewTodoRepository,
+		NewTodoService,
+		NewTodoGRPCService,
 		NewGRPCServer,
 		app.NewGRPCApp,
 	)

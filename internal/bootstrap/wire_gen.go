@@ -32,9 +32,11 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 	authHandler := NewAuthHandler(authService)
 	gormRepository := NewTodoRepository(gormDB)
 	service := NewTodoService(gormRepository)
+	todoServiceServer := NewTodoGRPCService(service)
 	todoHandler := NewTodoHandler(service, authService)
 	engine := NewHTTPRouter(loggerLogger, telemetryProvider, authHandler, todoHandler)
 	httpApp := app.NewHTTPApp(configConfig, loggerLogger, gormDB, telemetryProvider, engine)
+	_ = todoServiceServer
 	return httpApp, nil
 }
 
@@ -59,7 +61,10 @@ func InitializeGRPCApp() (*app.GRPCApp, error) {
 	if err != nil {
 		return nil, err
 	}
-	server := NewGRPCServer(loggerLogger, telemetryProvider)
+	gormRepository := NewTodoRepository(gormDB)
+	service := NewTodoService(gormRepository)
+	todoServiceServer := NewTodoGRPCService(service)
+	server := NewGRPCServer(loggerLogger, telemetryProvider, todoServiceServer)
 	grpcApp := app.NewGRPCApp(configConfig, loggerLogger, gormDB, telemetryProvider, server)
 	return grpcApp, nil
 }
