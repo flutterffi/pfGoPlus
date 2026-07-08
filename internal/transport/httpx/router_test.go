@@ -11,6 +11,7 @@ import (
 
 	"github.com/flutterffi/pfGoPlus/internal/bff"
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/audit"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
@@ -193,6 +194,46 @@ func TestMemberCannotListUsers(t *testing.T) {
 	}
 }
 
+func TestAdminCanListAuditLogs(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]string{
+		"username":     "alice",
+		"display_name": "Alice",
+		"password":     "secret123",
+		"role":         "member",
+	})
+	createRequest := httptest.NewRequest(http.MethodPost, "/api/v1/users", bytes.NewReader(body))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", "Bearer "+token)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/audit/logs", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	var response struct {
+		Data struct {
+			Items []struct {
+				Action string `json:"action"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal audit response: %v", err)
+	}
+	if len(response.Data.Items) == 0 {
+		t.Fatal("expected at least one audit log")
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -221,16 +262,19 @@ func newTestRouter(t *testing.T) http.Handler {
 		},
 	}
 	userRepo := &fakeUserRepo{}
+	auditRepo := &fakeAuditRepo{}
 	userService, err := user.NewService(cfg.Auth, userRepo)
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
+	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
-	userHandler := user.NewHandler(userService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+	auditHandler := audit.NewHandler(auditService, auth.RequireRole(authService, user.RoleAdmin))
+	userHandler := user.NewHandler(userService, auditService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
-	edge := bff.New(cfg, authHandler, userHandler, todoHandler, telemetryProvider)
+	edge := bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
 	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
 }
 
@@ -299,6 +343,7 @@ func newMemberRouter(t *testing.T) http.Handler {
 		},
 	}
 	userRepo := &fakeUserRepo{}
+	auditRepo := &fakeAuditRepo{}
 	userService, err := user.NewService(cfg.Auth, userRepo)
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
@@ -311,12 +356,14 @@ func newMemberRouter(t *testing.T) http.Handler {
 	}); err != nil {
 		t.Fatalf("seed member user: %v", err)
 	}
+	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
-	userHandler := user.NewHandler(userService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+	auditHandler := audit.NewHandler(auditService, auth.RequireRole(authService, user.RoleAdmin))
+	userHandler := user.NewHandler(userService, auditService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
-	edge := bff.New(cfg, authHandler, userHandler, todoHandler, telemetryProvider)
+	edge := bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
 	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
 }
 
@@ -375,4 +422,23 @@ func (f *fakeUserRepo) Update(_ context.Context, item *user.User) error {
 		}
 	}
 	return nil
+}
+
+type fakeAuditRepo struct {
+	items []audit.Log
+}
+
+func (f *fakeAuditRepo) Create(_ context.Context, item *audit.Log) error {
+	item.ID = uint(len(f.items) + 1)
+	f.items = append(f.items, *item)
+	return nil
+}
+
+func (f *fakeAuditRepo) List(_ context.Context, limit int) ([]audit.Log, error) {
+	if limit <= 0 || limit > len(f.items) {
+		limit = len(f.items)
+	}
+	items := make([]audit.Log, limit)
+	copy(items, f.items[:limit])
+	return items, nil
 }

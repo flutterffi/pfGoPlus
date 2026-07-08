@@ -33,11 +33,14 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 	repository := NewUserRepository(db)
 	service := NewAuthService(configConfig, repository)
 	handler := NewAuthHandler(service)
+	auditRepository := NewAuditRepository(db)
+	auditService := NewAuditService(auditRepository)
+	auditHandler := NewAuditHandler(auditService, service)
 	userService, err := NewUserService(configConfig, repository)
 	if err != nil {
 		return nil, err
 	}
-	userHandler := NewUserHandler(userService, service)
+	userHandler := NewUserHandler(userService, auditService, service)
 	todoRepository := NewTodoRepository(db)
 	todoService := NewTodoService(todoRepository)
 	todoBackend, err := NewTodoBackend(configConfig, logger, todoService)
@@ -46,7 +49,7 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 	}
 	api := NewTodoAPI(todoBackend)
 	todoHandler := NewTodoHandler(api, service)
-	edge := NewBFF(configConfig, handler, userHandler, todoHandler, provider)
+	edge := NewBFF(configConfig, handler, auditHandler, userHandler, todoHandler, provider)
 	engine := NewHTTPRouter(logger, provider, edge)
 	httpHandler := NewHTTPHandler(engine)
 	v := NewHTTPAppCleanups(todoBackend)

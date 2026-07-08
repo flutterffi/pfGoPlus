@@ -149,3 +149,24 @@ func TestUpdateUserCannotDisableSelf(t *testing.T) {
 		t.Fatal("expected self-disable error")
 	}
 }
+
+func TestUpdateUserCannotRemoveOwnAdminRole(t *testing.T) {
+	repo := &stubRepository{items: []User{{
+		ID:           1,
+		Username:     "admin",
+		DisplayName:  "Admin",
+		PasswordHash: "hashed",
+		Role:         RoleAdmin,
+		Status:       StatusActive,
+	}}}
+	service, err := NewService(config.AuthConfig{}, repo)
+	if err != nil {
+		t.Fatalf("new user service: %v", err)
+	}
+
+	role := RoleMember
+	_, err = service.Update(context.Background(), 1, UpdateRequest{Role: &role}, 1)
+	if err == nil {
+		t.Fatal("expected self-demotion error")
+	}
+}

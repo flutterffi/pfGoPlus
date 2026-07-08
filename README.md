@@ -84,6 +84,7 @@ Open:
 - `GET /api/v1/users` (admin only)
 - `POST /api/v1/users` (admin only)
 - `PATCH /api/v1/users/:id` (admin only, update role/status/profile/password)
+- `GET /api/v1/audit/logs` (admin only)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 - Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
@@ -117,6 +118,7 @@ pfGoPlus/
   internal/app/               # bootstrap and lifecycle
   internal/config/            # config model and loader
   internal/modules/auth/      # JWT login and auth middleware
+  internal/modules/audit/     # admin audit log module
   internal/modules/user/      # user identity and RBAC module
   internal/modules/todo/      # demo business module
   internal/platform/          # database, logger, telemetry
@@ -156,6 +158,7 @@ Current milestone:
 - layered config loading via base, profile, and env overrides
 - persisted user module with RBAC-aware auth and admin APIs
 - user lifecycle management with update and disable flows
+- audit log capture and admin query endpoint
 
 Next milestone:
 

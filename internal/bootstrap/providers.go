@@ -10,6 +10,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/app"
 	"github.com/flutterffi/pfGoPlus/internal/bff"
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/audit"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
@@ -48,10 +49,18 @@ func MigrateDatabase(cfg config.Config, db *gorm.DB) (*gorm.DB, error) {
 	if !cfg.Database.AutoMigrate {
 		return db, nil
 	}
-	if err := db.AutoMigrate(&user.User{}, &todo.Todo{}); err != nil {
+	if err := db.AutoMigrate(&user.User{}, &todo.Todo{}, &audit.Log{}); err != nil {
 		return nil, fmt.Errorf("auto migrate: %w", err)
 	}
 	return db, nil
+}
+
+func NewAuditRepository(db *gorm.DB) audit.Repository {
+	return audit.NewRepository(db)
+}
+
+func NewAuditService(repo audit.Repository) *audit.Service {
+	return audit.NewService(repo)
 }
 
 func NewUserRepository(db *gorm.DB) user.Repository {
@@ -70,8 +79,12 @@ func NewAuthHandler(service *auth.Service) *auth.Handler {
 	return auth.NewHandler(service)
 }
 
-func NewUserHandler(service *user.Service, authService *auth.Service) *user.Handler {
-	return user.NewHandler(service, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+func NewAuditHandler(service *audit.Service, authService *auth.Service) *audit.Handler {
+	return audit.NewHandler(service, auth.RequireRole(authService, user.RoleAdmin))
+}
+
+func NewUserHandler(service *user.Service, auditService *audit.Service, authService *auth.Service) *user.Handler {
+	return user.NewHandler(service, auditService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
 }
 
 func NewTodoRepository(db *gorm.DB) todo.Repository {
@@ -120,8 +133,8 @@ func NewTodoAPI(backend *TodoBackend) todo.API {
 	return backend.API
 }
 
-func NewBFF(cfg config.Config, authHandler *auth.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *bff.Edge {
-	return bff.New(cfg, authHandler, userHandler, todoHandler, telemetryProvider)
+func NewBFF(cfg config.Config, authHandler *auth.Handler, auditHandler *audit.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *bff.Edge {
+	return bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
 }
 
 func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, edge *bff.Edge) *gin.Engine {

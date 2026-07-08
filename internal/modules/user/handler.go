@@ -4,19 +4,22 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/flutterffi/pfGoPlus/internal/modules/audit"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
 	service *Service
+	audit   *audit.Service
 	authz   gin.HandlerFunc
 	adminz  gin.HandlerFunc
 }
 
-func NewHandler(service *Service, authz gin.HandlerFunc, adminz gin.HandlerFunc) *Handler {
+func NewHandler(service *Service, auditService *audit.Service, authz gin.HandlerFunc, adminz gin.HandlerFunc) *Handler {
 	return &Handler{
 		service: service,
+		audit:   auditService,
 		authz:   authz,
 		adminz:  adminz,
 	}
@@ -78,6 +81,7 @@ func (h *Handler) Create(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, "user created", gin.H{
 		"user": presentUser(item),
 	})
+	h.recordAudit(c, "user.create", "user", strconv.FormatUint(uint64(item.ID), 10), audit.StatusSuccess, "created user "+item.Username)
 }
 
 func (h *Handler) Update(c *gin.Context) {
@@ -105,6 +109,7 @@ func (h *Handler) Update(c *gin.Context) {
 	httpx.OK(c, gin.H{
 		"user": presentUser(item),
 	})
+	h.recordAudit(c, "user.update", "user", strconv.FormatUint(uint64(item.ID), 10), audit.StatusSuccess, "updated user "+item.Username)
 }
 
 func presentUser(item *User) gin.H {
@@ -116,5 +121,28 @@ func presentUser(item *User) gin.H {
 		"status":       item.Status,
 		"created_at":   item.CreatedAt,
 		"updated_at":   item.UpdatedAt,
+	}
+}
+
+func (h *Handler) recordAudit(c *gin.Context, action, resource, resourceID, status, detail string) {
+	if h.audit == nil {
+		return
+	}
+	actorID, ok := c.Get("auth_user_id")
+	if !ok {
+		return
+	}
+	currentActorID, _ := actorID.(uint)
+	if err := h.audit.Record(c.Request.Context(), audit.RecordRequest{
+		ActorID:       currentActorID,
+		ActorUsername: c.GetString("auth_username"),
+		Action:        action,
+		Resource:      resource,
+		ResourceID:    resourceID,
+		Status:        status,
+		TraceID:       httpx.TraceID(c),
+		Detail:        detail,
+	}); err != nil {
+		httpx.Logger(c).Error("record audit log failed")
 	}
 }
