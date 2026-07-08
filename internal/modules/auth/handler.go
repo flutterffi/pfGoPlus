@@ -42,5 +42,9 @@ func (h *Handler) Login(c *gin.Context) {
 }
 
 func (h *Handler) ListPermissions(c *gin.Context) {
-	httpx.OK(c, gin.H{"items": Catalog()})
+	httpx.OK(c, gin.H{
+		"items":          Catalog(),
+		"groups":         Groups(),
+		"role_templates": RoleTemplates(),
+	})
 }

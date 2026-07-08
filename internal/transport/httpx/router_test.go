@@ -163,6 +163,15 @@ func TestAdminCanListPermissionCatalog(t *testing.T) {
 				Key   string `json:"key"`
 				Group string `json:"group"`
 			} `json:"items"`
+			Groups []struct {
+				Key   string `json:"key"`
+				Order int    `json:"order"`
+			} `json:"groups"`
+			RoleTemplates []struct {
+				Key         string   `json:"key"`
+				System      bool     `json:"system"`
+				Permissions []string `json:"permissions"`
+			} `json:"role_templates"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
@@ -173,6 +182,18 @@ func TestAdminCanListPermissionCatalog(t *testing.T) {
 	}
 	if response.Data.Items[0].Key == "" || response.Data.Items[0].Group == "" {
 		t.Fatal("expected key and group in permission catalog item")
+	}
+	if len(response.Data.Groups) == 0 {
+		t.Fatal("expected permission groups")
+	}
+	if response.Data.Groups[0].Key == "" || response.Data.Groups[0].Order == 0 {
+		t.Fatal("expected group metadata in permission catalog response")
+	}
+	if len(response.Data.RoleTemplates) < 2 {
+		t.Fatal("expected role templates")
+	}
+	if response.Data.RoleTemplates[0].Key == "" || len(response.Data.RoleTemplates[0].Permissions) == 0 {
+		t.Fatal("expected role template permissions")
 	}
 }
 
