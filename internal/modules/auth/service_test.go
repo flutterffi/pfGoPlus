@@ -85,4 +85,7 @@ func TestParseTokenSuccess(t *testing.T) {
 	if claims.Role != user.RoleAdmin {
 		t.Fatalf("unexpected role: %s", claims.Role)
 	}
+	if len(claims.Permissions) == 0 {
+		t.Fatal("expected permissions in claims")
+	}
 }

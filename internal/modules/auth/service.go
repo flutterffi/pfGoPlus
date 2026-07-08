@@ -31,10 +31,11 @@ type LoginResult struct {
 }
 
 type Claims struct {
-	UserID      uint   `json:"user_id"`
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-	Role        string `json:"role"`
+	UserID      uint     `json:"user_id"`
+	Username    string   `json:"username"`
+	DisplayName string   `json:"display_name"`
+	Role        string   `json:"role"`
+	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
 
@@ -72,6 +73,7 @@ func (s *Service) Login(req LoginRequest) (*LoginResult, error) {
 		Username:    item.Username,
 		DisplayName: item.DisplayName,
 		Role:        item.Role,
+		Permissions: permissionsForRole(item.Role),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   item.Username,

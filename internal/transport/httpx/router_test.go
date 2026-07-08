@@ -127,6 +127,20 @@ func TestCurrentUserEndpoint(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
 	}
+
+	var response struct {
+		Data struct {
+			User struct {
+				Permissions []string `json:"permissions"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal me response: %v", err)
+	}
+	if len(response.Data.User.Permissions) == 0 {
+		t.Fatal("expected permissions in current user response")
+	}
 }
 
 func TestAdminCanCreateUser(t *testing.T) {
@@ -271,7 +285,13 @@ func newTestRouter(t *testing.T) http.Handler {
 	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
 	auditHandler := audit.NewHandler(auditService, auth.RequireRole(authService, user.RoleAdmin))
-	userHandler := user.NewHandler(userService, auditService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+	userHandler := user.NewHandler(
+		userService,
+		auditService,
+		auth.RequireAuth(authService),
+		auth.RequirePermission(authService, auth.PermissionUsersRead),
+		auth.RequirePermission(authService, auth.PermissionUsersWrite),
+	)
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
 	edge := bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
@@ -360,7 +380,13 @@ func newMemberRouter(t *testing.T) http.Handler {
 	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
 	auditHandler := audit.NewHandler(auditService, auth.RequireRole(authService, user.RoleAdmin))
-	userHandler := user.NewHandler(userService, auditService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+	userHandler := user.NewHandler(
+		userService,
+		auditService,
+		auth.RequireAuth(authService),
+		auth.RequirePermission(authService, auth.PermissionUsersRead),
+		auth.RequirePermission(authService, auth.PermissionUsersWrite),
+	)
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
 	edge := bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)

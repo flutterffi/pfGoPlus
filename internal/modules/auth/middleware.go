@@ -13,6 +13,7 @@ const (
 	authUsernameKey    = "auth_username"
 	authDisplayNameKey = "auth_display_name"
 	authRoleKey        = "auth_role"
+	authPermissionsKey = "auth_permissions"
 )
 
 func RequireAuth(service *Service) gin.HandlerFunc {
@@ -29,6 +30,7 @@ func RequireAuth(service *Service) gin.HandlerFunc {
 		c.Set(authUsernameKey, claims.Username)
 		c.Set(authDisplayNameKey, claims.DisplayName)
 		c.Set(authRoleKey, claims.Role)
+		c.Set(authPermissionsKey, claims.Permissions)
 		c.Next()
 	}
 }
@@ -46,8 +48,35 @@ func RequireRole(service *Service, roles ...string) gin.HandlerFunc {
 		c.Set(authUsernameKey, claims.Username)
 		c.Set(authDisplayNameKey, claims.DisplayName)
 		c.Set(authRoleKey, claims.Role)
+		c.Set(authPermissionsKey, claims.Permissions)
 		for _, role := range roles {
 			if strings.EqualFold(claims.Role, role) {
+				c.Next()
+				return
+			}
+		}
+
+		_ = c.Error(httpx.Forbidden("insufficient permissions", nil))
+		c.Abort()
+	}
+}
+
+func RequirePermission(service *Service, permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, err := authenticate(service, c)
+		if err != nil {
+			_ = c.Error(err)
+			c.Abort()
+			return
+		}
+		c.Set(authUserKey, claims)
+		c.Set(authUserIDKey, claims.UserID)
+		c.Set(authUsernameKey, claims.Username)
+		c.Set(authDisplayNameKey, claims.DisplayName)
+		c.Set(authRoleKey, claims.Role)
+		c.Set(authPermissionsKey, claims.Permissions)
+		for _, permission := range permissions {
+			if hasPermission(claims.Permissions, permission) {
 				c.Next()
 				return
 			}
@@ -73,6 +102,15 @@ func CurrentUser(c *gin.Context) string {
 		return ""
 	}
 	return claims.Username
+}
+
+func CurrentPermissions(c *gin.Context) []string {
+	value, ok := c.Get(authPermissionsKey)
+	if !ok {
+		return nil
+	}
+	permissions, _ := value.([]string)
+	return permissions
 }
 
 func authenticate(service *Service, c *gin.Context) (*Claims, error) {

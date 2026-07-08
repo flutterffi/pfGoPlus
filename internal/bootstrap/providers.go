@@ -80,11 +80,17 @@ func NewAuthHandler(service *auth.Service) *auth.Handler {
 }
 
 func NewAuditHandler(service *audit.Service, authService *auth.Service) *audit.Handler {
-	return audit.NewHandler(service, auth.RequireRole(authService, user.RoleAdmin))
+	return audit.NewHandler(service, auth.RequirePermission(authService, auth.PermissionAuditRead))
 }
 
 func NewUserHandler(service *user.Service, auditService *audit.Service, authService *auth.Service) *user.Handler {
-	return user.NewHandler(service, auditService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+	return user.NewHandler(
+		service,
+		auditService,
+		auth.RequireAuth(authService),
+		auth.RequirePermission(authService, auth.PermissionUsersRead),
+		auth.RequirePermission(authService, auth.PermissionUsersWrite),
+	)
 }
 
 func NewTodoRepository(db *gorm.DB) todo.Repository {

@@ -159,6 +159,7 @@ Current milestone:
 - persisted user module with RBAC-aware auth and admin APIs
 - user lifecycle management with update and disable flows
 - audit log capture and admin query endpoint
+- role-to-permission authorization for admin and member APIs
 
 Next milestone:
 

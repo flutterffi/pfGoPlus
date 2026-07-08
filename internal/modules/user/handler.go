@@ -13,15 +13,17 @@ type Handler struct {
 	service *Service
 	audit   *audit.Service
 	authz   gin.HandlerFunc
-	adminz  gin.HandlerFunc
+	readz   gin.HandlerFunc
+	writez  gin.HandlerFunc
 }
 
-func NewHandler(service *Service, auditService *audit.Service, authz gin.HandlerFunc, adminz gin.HandlerFunc) *Handler {
+func NewHandler(service *Service, auditService *audit.Service, authz gin.HandlerFunc, readz gin.HandlerFunc, writez gin.HandlerFunc) *Handler {
 	return &Handler{
 		service: service,
 		audit:   auditService,
 		authz:   authz,
-		adminz:  adminz,
+		readz:   readz,
+		writez:  writez,
 	}
 }
 
@@ -29,9 +31,9 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	users := group.Group("/users")
 	users.Use(h.authz)
 	users.GET("/me", h.Me)
-	users.GET("", h.adminz, h.List)
-	users.POST("", h.adminz, h.Create)
-	users.PATCH("/:id", h.adminz, h.Update)
+	users.GET("", h.readz, h.List)
+	users.POST("", h.writez, h.Create)
+	users.PATCH("/:id", h.writez, h.Update)
 }
 
 func (h *Handler) Me(c *gin.Context) {
@@ -46,6 +48,7 @@ func (h *Handler) Me(c *gin.Context) {
 			"username":     c.GetString("auth_username"),
 			"display_name": c.GetString("auth_display_name"),
 			"role":         c.GetString("auth_role"),
+			"permissions":  c.GetStringSlice("auth_permissions"),
 		},
 	})
 }
