@@ -12,6 +12,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/audit"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/platform/database"
@@ -49,10 +50,22 @@ func MigrateDatabase(cfg config.Config, db *gorm.DB) (*gorm.DB, error) {
 	if !cfg.Database.AutoMigrate {
 		return db, nil
 	}
-	if err := db.AutoMigrate(&user.User{}, &todo.Todo{}, &audit.Log{}); err != nil {
+	if err := db.AutoMigrate(&role.Role{}, &user.User{}, &todo.Todo{}, &audit.Log{}); err != nil {
 		return nil, fmt.Errorf("auto migrate: %w", err)
 	}
 	return db, nil
+}
+
+func NewRoleRepository(db *gorm.DB) role.Repository {
+	return role.NewRepository(db)
+}
+
+func NewRoleService(repo role.Repository) (*role.Service, error) {
+	service := role.NewService(repo)
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		return nil, err
+	}
+	return service, nil
 }
 
 func NewAuditRepository(db *gorm.DB) audit.Repository {
@@ -67,16 +80,20 @@ func NewUserRepository(db *gorm.DB) user.Repository {
 	return user.NewRepository(db)
 }
 
-func NewUserService(cfg config.Config, repo user.Repository) (*user.Service, error) {
-	return user.NewService(cfg.Auth, repo)
+func NewUserService(cfg config.Config, repo user.Repository, roles *role.Service) (*user.Service, error) {
+	return user.NewService(cfg.Auth, repo, roles)
 }
 
-func NewAuthService(cfg config.Config, repo user.Repository) *auth.Service {
-	return auth.NewService(cfg.Auth, repo)
+func NewAuthService(cfg config.Config, repo user.Repository, roles *role.Service) *auth.Service {
+	return auth.NewService(cfg.Auth, repo, roles)
 }
 
 func NewAuthHandler(service *auth.Service) *auth.Handler {
 	return auth.NewHandler(service)
+}
+
+func NewRoleHandler(service *role.Service, authService *auth.Service) *role.Handler {
+	return role.NewHandler(service, auth.RequirePermission(authService, auth.PermissionRolesRead))
 }
 
 func NewAuditHandler(service *audit.Service, authService *auth.Service) *audit.Handler {
@@ -139,8 +156,8 @@ func NewTodoAPI(backend *TodoBackend) todo.API {
 	return backend.API
 }
 
-func NewBFF(cfg config.Config, authHandler *auth.Handler, auditHandler *audit.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *bff.Edge {
-	return bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
+func NewBFF(cfg config.Config, authHandler *auth.Handler, roleHandler *role.Handler, auditHandler *audit.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *bff.Edge {
+	return bff.New(cfg, authHandler, roleHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
 }
 
 func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, edge *bff.Edge) *gin.Engine {

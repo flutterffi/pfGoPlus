@@ -5,11 +5,13 @@ import (
 	"strings"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 )
 
 type Service struct {
-	repo Repository
+	repo  Repository
+	roles *role.Service
 }
 
 type CreateRequest struct {
@@ -26,8 +28,8 @@ type UpdateRequest struct {
 	Status      *string `json:"status"`
 }
 
-func NewService(cfg config.AuthConfig, repo Repository) (*Service, error) {
-	service := &Service{repo: repo}
+func NewService(cfg config.AuthConfig, repo Repository, roles *role.Service) (*Service, error) {
+	service := &Service{repo: repo, roles: roles}
 	if err := service.EnsureBootstrapAdmin(context.Background(), cfg); err != nil {
 		return nil, err
 	}
@@ -79,8 +81,8 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*User, error) 
 	if displayName == "" {
 		displayName = username
 	}
-	if !isValidRole(role) {
-		return nil, httpx.BadRequest("role must be admin or member", nil)
+	if err := s.validateRole(ctx, role); err != nil {
+		return nil, err
 	}
 
 	existing, err := s.repo.FindByUsername(ctx, username)
@@ -148,8 +150,8 @@ func (s *Service) Update(ctx context.Context, id uint, req UpdateRequest, actorI
 
 	if req.Role != nil {
 		role := normalizeRole(*req.Role)
-		if !isValidRole(role) {
-			return nil, httpx.BadRequest("role must be admin or member", nil)
+		if err := s.validateRole(ctx, role); err != nil {
+			return nil, err
 		}
 		if actorID == item.ID && item.Role == RoleAdmin && role != RoleAdmin {
 			return nil, httpx.BadRequest("admin cannot remove own admin role", nil)
@@ -174,19 +176,13 @@ func (s *Service) Update(ctx context.Context, id uint, req UpdateRequest, actorI
 	return item, nil
 }
 
-func normalizeRole(role string) string {
-	switch strings.ToLower(strings.TrimSpace(role)) {
-	case "", RoleMember:
-		return RoleMember
-	case RoleAdmin:
-		return RoleAdmin
+func normalizeRole(roleName string) string {
+	switch strings.ToLower(strings.TrimSpace(roleName)) {
+	case "":
+		return role.NameMember
 	default:
-		return strings.ToLower(strings.TrimSpace(role))
+		return strings.ToLower(strings.TrimSpace(roleName))
 	}
-}
-
-func isValidRole(role string) bool {
-	return role == RoleAdmin || role == RoleMember
 }
 
 func normalizeStatus(status string) string {
@@ -202,4 +198,15 @@ func normalizeStatus(status string) string {
 
 func isValidStatus(status string) bool {
 	return status == StatusActive || status == StatusDisabled
+}
+
+func (s *Service) validateRole(ctx context.Context, name string) error {
+	exists, err := s.roles.RoleExists(ctx, name)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return httpx.BadRequest("role not found", nil)
+	}
+	return nil
 }

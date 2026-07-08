@@ -13,6 +13,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/audit"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
@@ -257,6 +258,34 @@ func TestAdminCanListAuditLogs(t *testing.T) {
 	}
 }
 
+func TestAdminCanListRoles(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/roles", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	var response struct {
+		Data struct {
+			Items []struct {
+				Name string `json:"name"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal roles response: %v", err)
+	}
+	if len(response.Data.Items) < 2 {
+		t.Fatalf("expected at least 2 roles, got %d", len(response.Data.Items))
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -286,13 +315,19 @@ func newTestRouter(t *testing.T) http.Handler {
 	}
 	userRepo := &fakeUserRepo{}
 	auditRepo := &fakeAuditRepo{}
-	userService, err := user.NewService(cfg.Auth, userRepo)
+	roleRepo := newFakeRoleRepo()
+	roleService := role.NewService(roleRepo)
+	if err := roleService.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure default roles: %v", err)
+	}
+	userService, err := user.NewService(cfg.Auth, userRepo, roleService)
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
 	auditService := audit.NewService(auditRepo)
-	authService := auth.NewService(cfg.Auth, userRepo)
+	authService := auth.NewService(cfg.Auth, userRepo, roleService)
 	authHandler := auth.NewHandler(authService)
+	roleHandler := role.NewHandler(roleService, auth.RequirePermission(authService, auth.PermissionRolesRead))
 	auditHandler := audit.NewHandler(auditService, auth.RequirePermission(authService, auth.PermissionAuditRead))
 	userHandler := user.NewHandler(
 		userService,
@@ -303,7 +338,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	)
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
-	edge := bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
+	edge := bff.New(cfg, authHandler, roleHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
 	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
 }
 
@@ -373,7 +408,12 @@ func newMemberRouter(t *testing.T) http.Handler {
 	}
 	userRepo := &fakeUserRepo{}
 	auditRepo := &fakeAuditRepo{}
-	userService, err := user.NewService(cfg.Auth, userRepo)
+	roleRepo := newFakeRoleRepo()
+	roleService := role.NewService(roleRepo)
+	if err := roleService.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure default roles: %v", err)
+	}
+	userService, err := user.NewService(cfg.Auth, userRepo, roleService)
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
@@ -386,8 +426,9 @@ func newMemberRouter(t *testing.T) http.Handler {
 		t.Fatalf("seed member user: %v", err)
 	}
 	auditService := audit.NewService(auditRepo)
-	authService := auth.NewService(cfg.Auth, userRepo)
+	authService := auth.NewService(cfg.Auth, userRepo, roleService)
 	authHandler := auth.NewHandler(authService)
+	roleHandler := role.NewHandler(roleService, auth.RequirePermission(authService, auth.PermissionRolesRead))
 	auditHandler := audit.NewHandler(auditService, auth.RequirePermission(authService, auth.PermissionAuditRead))
 	userHandler := user.NewHandler(
 		userService,
@@ -398,7 +439,7 @@ func newMemberRouter(t *testing.T) http.Handler {
 	)
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
-	edge := bff.New(cfg, authHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
+	edge := bff.New(cfg, authHandler, roleHandler, auditHandler, userHandler, todoHandler, telemetryProvider)
 	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
 }
 
@@ -415,6 +456,10 @@ func (f *fakeTodoRepo) List(_ context.Context) ([]todo.Todo, error) {
 
 type fakeUserRepo struct {
 	items []user.User
+}
+
+type fakeRoleRepo struct {
+	items []role.Role
 }
 
 func (f *fakeUserRepo) Create(_ context.Context, item *user.User) error {
@@ -457,6 +502,32 @@ func (f *fakeUserRepo) Update(_ context.Context, item *user.User) error {
 		}
 	}
 	return nil
+}
+
+func newFakeRoleRepo() *fakeRoleRepo {
+	return &fakeRoleRepo{}
+}
+
+func (f *fakeRoleRepo) Create(_ context.Context, item *role.Role) error {
+	item.ID = uint(len(f.items) + 1)
+	f.items = append(f.items, *item)
+	return nil
+}
+
+func (f *fakeRoleRepo) FindByName(_ context.Context, name string) (*role.Role, error) {
+	for i := range f.items {
+		if f.items[i].Name == name {
+			item := f.items[i]
+			return &item, nil
+		}
+	}
+	return nil, nil
+}
+
+func (f *fakeRoleRepo) List(_ context.Context) ([]role.Role, error) {
+	items := make([]role.Role, len(f.items))
+	copy(items, f.items)
+	return items, nil
 }
 
 type fakeAuditRepo struct {

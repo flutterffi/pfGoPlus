@@ -4,6 +4,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/audit"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
@@ -14,16 +15,18 @@ import (
 type Edge struct {
 	cfg          config.Config
 	authHandler  *auth.Handler
+	roleHandler  *role.Handler
 	auditHandler *audit.Handler
 	userHandler  *user.Handler
 	todoHandler  *todo.Handler
 	telemetry    *telemetry.Provider
 }
 
-func New(cfg config.Config, authHandler *auth.Handler, auditHandler *audit.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *Edge {
+func New(cfg config.Config, authHandler *auth.Handler, roleHandler *role.Handler, auditHandler *audit.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *Edge {
 	return &Edge{
 		cfg:          cfg,
 		authHandler:  authHandler,
+		roleHandler:  roleHandler,
 		auditHandler: auditHandler,
 		userHandler:  userHandler,
 		todoHandler:  todoHandler,
@@ -38,6 +41,7 @@ func (e *Edge) Compose(router *gin.Engine) {
 
 	v1 := router.Group("/api/v1")
 	e.authHandler.RegisterRoutes(v1)
+	e.roleHandler.RegisterRoutes(v1)
 	e.auditHandler.RegisterRoutes(v1)
 	e.userHandler.RegisterRoutes(v1)
 	e.todoHandler.RegisterRoutes(v1)

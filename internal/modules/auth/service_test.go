@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 )
 
@@ -35,6 +36,10 @@ func newTestService(t *testing.T) *Service {
 		t.Fatalf("hash password: %v", err)
 	}
 
+	roleRepo := &stubRoleRepo{items: []role.Role{
+		{Name: role.NameAdmin, Permissions: `["users:read","users:write","audit:read","roles:read","todos:read","todos:write"]`},
+	}}
+
 	return NewService(config.AuthConfig{
 		JWTSecret:      "test-secret",
 		JWTIssuer:      "pfGoPlus-test",
@@ -46,8 +51,26 @@ func newTestService(t *testing.T) *Service {
 		PasswordHash: hash,
 		Role:         user.RoleAdmin,
 		Status:       user.StatusActive,
-	}})
+	}}, role.NewService(roleRepo))
 }
+
+type stubRoleRepo struct {
+	items []role.Role
+}
+
+func (s *stubRoleRepo) Create(context.Context, *role.Role) error { return nil }
+
+func (s *stubRoleRepo) FindByName(_ context.Context, name string) (*role.Role, error) {
+	for i := range s.items {
+		if s.items[i].Name == name {
+			item := s.items[i]
+			return &item, nil
+		}
+	}
+	return nil, nil
+}
+
+func (s *stubRoleRepo) List(context.Context) ([]role.Role, error) { return s.items, nil }
 
 func TestLoginSuccess(t *testing.T) {
 	service := newTestService(t)

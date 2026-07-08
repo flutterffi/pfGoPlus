@@ -86,6 +86,7 @@ Open:
 - `PATCH /api/v1/users/:id` (admin only, update role/status/profile/password)
 - `GET /api/v1/audit/logs` (admin only)
   supports `actor_username`, `action`, `resource`, `status`, `trace_id`, `limit`, `offset`
+- `GET /api/v1/roles` (admin only)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 - Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
@@ -120,6 +121,7 @@ pfGoPlus/
   internal/config/            # config model and loader
   internal/modules/auth/      # JWT login and auth middleware
   internal/modules/audit/     # admin audit log module
+  internal/modules/role/      # role catalog and permissions module
   internal/modules/user/      # user identity and RBAC module
   internal/modules/todo/      # demo business module
   internal/platform/          # database, logger, telemetry
@@ -162,6 +164,7 @@ Current milestone:
 - audit log capture and admin query endpoint
 - role-to-permission authorization for admin and member APIs
 - audit log filtering and pagination
+- persisted role catalog with seeded permissions
 
 Next milestone:
 

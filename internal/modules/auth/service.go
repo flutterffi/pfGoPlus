@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"github.com/golang-jwt/jwt/v5"
@@ -17,6 +18,7 @@ type Service struct {
 	issuer   string
 	tokenTTL time.Duration
 	users    user.Repository
+	roles    *role.Service
 }
 
 type LoginRequest struct {
@@ -39,12 +41,13 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewService(cfg config.AuthConfig, users user.Repository) *Service {
+func NewService(cfg config.AuthConfig, users user.Repository, roles *role.Service) *Service {
 	return &Service{
 		secret:   []byte(cfg.JWTSecret),
 		issuer:   cfg.JWTIssuer,
 		tokenTTL: cfg.AccessTokenTTL,
 		users:    users,
+		roles:    roles,
 	}
 }
 
@@ -66,6 +69,10 @@ func (s *Service) Login(req LoginRequest) (*LoginResult, error) {
 	if item.Status != user.StatusActive {
 		return nil, httpx.Unauthorized("user is disabled", nil)
 	}
+	permissions, err := s.roles.ResolvePermissions(context.Background(), item.Role)
+	if err != nil {
+		return nil, err
+	}
 
 	expiresAt := time.Now().Add(s.tokenTTL)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
@@ -73,7 +80,7 @@ func (s *Service) Login(req LoginRequest) (*LoginResult, error) {
 		Username:    item.Username,
 		DisplayName: item.DisplayName,
 		Role:        item.Role,
-		Permissions: permissionsForRole(item.Role),
+		Permissions: permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Subject:   item.Username,

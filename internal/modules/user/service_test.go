@@ -6,10 +6,15 @@ import (
 	"time"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/role"
 )
 
 type stubRepository struct {
 	items []User
+}
+
+type stubRoleRepo struct {
+	items []role.Role
 }
 
 func (s *stubRepository) Create(_ context.Context, item *User) error {
@@ -57,13 +62,45 @@ func (s *stubRepository) Update(_ context.Context, item *User) error {
 	return nil
 }
 
+func (s *stubRoleRepo) Create(_ context.Context, item *role.Role) error {
+	s.items = append(s.items, *item)
+	return nil
+}
+
+func (s *stubRoleRepo) FindByName(_ context.Context, name string) (*role.Role, error) {
+	for i := range s.items {
+		if s.items[i].Name == name {
+			item := s.items[i]
+			return &item, nil
+		}
+	}
+	return nil, nil
+}
+
+func (s *stubRoleRepo) List(_ context.Context) ([]role.Role, error) {
+	items := make([]role.Role, len(s.items))
+	copy(items, s.items)
+	return items, nil
+}
+
+func newRoleService(t *testing.T) *role.Service {
+	t.Helper()
+	repo := &stubRoleRepo{}
+	service := role.NewService(repo)
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure default roles: %v", err)
+	}
+	return service
+}
+
 func TestNewServiceSeedsBootstrapAdmin(t *testing.T) {
 	repo := &stubRepository{}
+	roles := newRoleService(t)
 
 	service, err := NewService(config.AuthConfig{
 		DemoUsername: "admin",
 		DemoPassword: "admin123",
-	}, repo)
+	}, repo, roles)
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
@@ -83,7 +120,7 @@ func TestNewServiceSeedsBootstrapAdmin(t *testing.T) {
 
 func TestCreateUserSuccess(t *testing.T) {
 	repo := &stubRepository{}
-	service, err := NewService(config.AuthConfig{}, repo)
+	service, err := NewService(config.AuthConfig{}, repo, newRoleService(t))
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
@@ -114,7 +151,7 @@ func TestUpdateUserDisableSuccess(t *testing.T) {
 		Role:         RoleMember,
 		Status:       StatusActive,
 	}}}
-	service, err := NewService(config.AuthConfig{}, repo)
+	service, err := NewService(config.AuthConfig{}, repo, newRoleService(t))
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
@@ -138,7 +175,7 @@ func TestUpdateUserCannotDisableSelf(t *testing.T) {
 		Role:         RoleAdmin,
 		Status:       StatusActive,
 	}}}
-	service, err := NewService(config.AuthConfig{}, repo)
+	service, err := NewService(config.AuthConfig{}, repo, newRoleService(t))
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}
@@ -159,7 +196,7 @@ func TestUpdateUserCannotRemoveOwnAdminRole(t *testing.T) {
 		Role:         RoleAdmin,
 		Status:       StatusActive,
 	}}}
-	service, err := NewService(config.AuthConfig{}, repo)
+	service, err := NewService(config.AuthConfig{}, repo, newRoleService(t))
 	if err != nil {
 		t.Fatalf("new user service: %v", err)
 	}

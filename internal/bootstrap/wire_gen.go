@@ -31,16 +31,22 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 		return nil, err
 	}
 	repository := NewUserRepository(db)
-	service := NewAuthService(configConfig, repository)
-	handler := NewAuthHandler(service)
-	auditRepository := NewAuditRepository(db)
-	auditService := NewAuditService(auditRepository)
-	auditHandler := NewAuditHandler(auditService, service)
-	userService, err := NewUserService(configConfig, repository)
+	roleRepository := NewRoleRepository(db)
+	service, err := NewRoleService(roleRepository)
 	if err != nil {
 		return nil, err
 	}
-	userHandler := NewUserHandler(userService, auditService, service)
+	authService := NewAuthService(configConfig, repository, service)
+	handler := NewAuthHandler(authService)
+	roleHandler := NewRoleHandler(service, authService)
+	auditRepository := NewAuditRepository(db)
+	auditService := NewAuditService(auditRepository)
+	auditHandler := NewAuditHandler(auditService, authService)
+	userService, err := NewUserService(configConfig, repository, service)
+	if err != nil {
+		return nil, err
+	}
+	userHandler := NewUserHandler(userService, auditService, authService)
 	todoRepository := NewTodoRepository(db)
 	todoService := NewTodoService(todoRepository)
 	todoBackend, err := NewTodoBackend(configConfig, logger, todoService)
@@ -48,8 +54,8 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 		return nil, err
 	}
 	api := NewTodoAPI(todoBackend)
-	todoHandler := NewTodoHandler(api, service)
-	edge := NewBFF(configConfig, handler, auditHandler, userHandler, todoHandler, provider)
+	todoHandler := NewTodoHandler(api, authService)
+	edge := NewBFF(configConfig, handler, roleHandler, auditHandler, userHandler, todoHandler, provider)
 	engine := NewHTTPRouter(logger, provider, edge)
 	httpHandler := NewHTTPHandler(engine)
 	v := NewHTTPAppCleanups(todoBackend)
