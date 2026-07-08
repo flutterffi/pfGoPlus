@@ -224,7 +224,7 @@ func TestAdminCanListAuditLogs(t *testing.T) {
 	createRecorder := httptest.NewRecorder()
 	router.ServeHTTP(createRecorder, createRequest)
 
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/audit/logs", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/audit/logs?action=user.create&resource=user&limit=10&offset=0", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
@@ -235,6 +235,7 @@ func TestAdminCanListAuditLogs(t *testing.T) {
 
 	var response struct {
 		Data struct {
+			Total int `json:"total"`
 			Items []struct {
 				Action string `json:"action"`
 			} `json:"items"`
@@ -245,6 +246,14 @@ func TestAdminCanListAuditLogs(t *testing.T) {
 	}
 	if len(response.Data.Items) == 0 {
 		t.Fatal("expected at least one audit log")
+	}
+	if response.Data.Total == 0 {
+		t.Fatal("expected total count")
+	}
+	for _, item := range response.Data.Items {
+		if item.Action != "user.create" {
+			t.Fatalf("expected filtered action user.create, got %s", item.Action)
+		}
 	}
 }
 
@@ -284,7 +293,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
-	auditHandler := audit.NewHandler(auditService, auth.RequireRole(authService, user.RoleAdmin))
+	auditHandler := audit.NewHandler(auditService, auth.RequirePermission(authService, auth.PermissionAuditRead))
 	userHandler := user.NewHandler(
 		userService,
 		auditService,
@@ -379,7 +388,7 @@ func newMemberRouter(t *testing.T) http.Handler {
 	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
-	auditHandler := audit.NewHandler(auditService, auth.RequireRole(authService, user.RoleAdmin))
+	auditHandler := audit.NewHandler(auditService, auth.RequirePermission(authService, auth.PermissionAuditRead))
 	userHandler := user.NewHandler(
 		userService,
 		auditService,
@@ -460,11 +469,35 @@ func (f *fakeAuditRepo) Create(_ context.Context, item *audit.Log) error {
 	return nil
 }
 
-func (f *fakeAuditRepo) List(_ context.Context, limit int) ([]audit.Log, error) {
-	if limit <= 0 || limit > len(f.items) {
-		limit = len(f.items)
+func (f *fakeAuditRepo) List(_ context.Context, query audit.ListQuery) ([]audit.Log, int64, error) {
+	filtered := make([]audit.Log, 0, len(f.items))
+	for _, item := range f.items {
+		if query.ActorUsername != "" && item.ActorUsername != query.ActorUsername {
+			continue
+		}
+		if query.Action != "" && item.Action != query.Action {
+			continue
+		}
+		if query.Resource != "" && item.Resource != query.Resource {
+			continue
+		}
+		if query.Status != "" && item.Status != query.Status {
+			continue
+		}
+		if query.TraceID != "" && item.TraceID != query.TraceID {
+			continue
+		}
+		filtered = append(filtered, item)
 	}
-	items := make([]audit.Log, limit)
-	copy(items, f.items[:limit])
-	return items, nil
+	total := int64(len(filtered))
+	if query.Offset > len(filtered) {
+		return nil, total, nil
+	}
+	end := query.Offset + query.Limit
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	items := make([]audit.Log, end-query.Offset)
+	copy(items, filtered[query.Offset:end])
+	return items, total, nil
 }

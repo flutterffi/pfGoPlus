@@ -85,6 +85,7 @@ Open:
 - `POST /api/v1/users` (admin only)
 - `PATCH /api/v1/users/:id` (admin only, update role/status/profile/password)
 - `GET /api/v1/audit/logs` (admin only)
+  supports `actor_username`, `action`, `resource`, `status`, `trace_id`, `limit`, `offset`
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 - Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
@@ -160,6 +161,7 @@ Current milestone:
 - user lifecycle management with update and disable flows
 - audit log capture and admin query endpoint
 - role-to-permission authorization for admin and member APIs
+- audit log filtering and pagination
 
 Next milestone:
 

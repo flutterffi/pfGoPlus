@@ -11,6 +11,23 @@ type Service struct {
 	repo Repository
 }
 
+type ListQuery struct {
+	ActorUsername string
+	Action        string
+	Resource      string
+	Status        string
+	TraceID       string
+	Limit         int
+	Offset        int
+}
+
+type ListResult struct {
+	Items  []Log
+	Total  int64
+	Limit  int
+	Offset int
+}
+
 type RecordRequest struct {
 	ActorID       uint
 	ActorUsername string
@@ -50,12 +67,19 @@ func (s *Service) Record(ctx context.Context, req RecordRequest) error {
 	return nil
 }
 
-func (s *Service) List(ctx context.Context, limit int) ([]Log, error) {
-	items, err := s.repo.List(ctx, limit)
+func (s *Service) List(ctx context.Context, query ListQuery) (*ListResult, error) {
+	query = normalizeListQuery(query)
+
+	items, total, err := s.repo.List(ctx, query)
 	if err != nil {
 		return nil, httpx.Internal("list audit logs failed", err)
 	}
-	return items, nil
+	return &ListResult{
+		Items:  items,
+		Total:  total,
+		Limit:  query.Limit,
+		Offset: query.Offset,
+	}, nil
 }
 
 func normalizeStatus(status string) string {
@@ -65,4 +89,22 @@ func normalizeStatus(status string) string {
 	default:
 		return StatusFailure
 	}
+}
+
+func normalizeListQuery(query ListQuery) ListQuery {
+	query.ActorUsername = strings.TrimSpace(query.ActorUsername)
+	query.Action = strings.TrimSpace(query.Action)
+	query.Resource = strings.TrimSpace(query.Resource)
+	query.Status = strings.TrimSpace(query.Status)
+	query.TraceID = strings.TrimSpace(query.TraceID)
+	if query.Limit <= 0 {
+		query.Limit = 50
+	}
+	if query.Limit > 200 {
+		query.Limit = 200
+	}
+	if query.Offset < 0 {
+		query.Offset = 0
+	}
+	return query
 }
