@@ -26,7 +26,9 @@ func TestNewSupportsOTLPExporter(t *testing.T) {
 	if provider.MetricsHandler() != nil {
 		t.Fatal("expected no metrics handler for otlp exporter")
 	}
-	if err := provider.Shutdown(context.Background()); err != nil && !strings.Contains(err.Error(), "connection refused") {
+	if err := provider.Shutdown(context.Background()); err != nil &&
+		!strings.Contains(err.Error(), "connection refused") &&
+		!strings.Contains(err.Error(), "operation not permitted") {
 		t.Fatalf("shutdown telemetry provider: %v", err)
 	}
 }

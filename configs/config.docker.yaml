@@ -1,0 +1,16 @@
+app:
+  env: docker
+
+grpc:
+  client_target: grpcserver:9090
+
+database:
+  dsn: /app/tmp/pfgo-plus.db
+
+observability:
+  exporter: otlp
+  otlp_endpoint: otel-collector:4317
+  otlp_insecure: true
+
+todo_backend:
+  mode: grpc

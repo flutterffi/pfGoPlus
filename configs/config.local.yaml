@@ -1,0 +1,11 @@
+app:
+  env: local
+
+database:
+  dsn: ./tmp/pfgo-plus.db
+
+observability:
+  exporter: stdout
+
+todo_backend:
+  mode: local

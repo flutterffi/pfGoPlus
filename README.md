@@ -29,6 +29,14 @@ make run
 go run ./cmd/grpcserver
 ```
 
+Switch config profile with layered files:
+
+```bash
+PFGO_APP_ENV=local make run
+PFGO_APP_ENV=test make run
+PFGO_APP_ENV=docker make run
+```
+
 Start the full local stack with OTLP collector and Prometheus:
 
 ```bash
@@ -58,6 +66,12 @@ PFGO_OBSERVABILITY_EXPORTER=otlp \
 PFGO_OBSERVABILITY_OTLP_ENDPOINT=127.0.0.1:4317 \
 PFGO_OBSERVABILITY_OTLP_INSECURE=true \
 make run
+```
+
+Use an explicit config file when needed:
+
+```bash
+PFGO_CONFIG_FILE=./configs/config.test.yaml make run
 ```
 
 Open:
@@ -94,7 +108,7 @@ curl -X POST http://127.0.0.1:8080/api/v1/todos \
 pfGoPlus/
   cmd/server/                 # process entrypoint
   cmd/grpcserver/             # grpc process entrypoint
-  configs/                    # viper config files
+  configs/                    # base + profile-layered config files
   internal/bootstrap/         # wire-style assembly
   internal/app/               # bootstrap and lifecycle
   internal/config/            # config model and loader
@@ -134,9 +148,10 @@ Current milestone:
 - real Wire generation workflow via `make wire`
 - OTLP exporter support for traces and metrics
 - local Docker Compose stack with gRPC, OTEL Collector, and Prometheus
+- layered config loading via base, profile, and env overrides
 
 Next milestone:
 
 - business protobuf contracts
 - grpc-gateway or BFF-style edge transport
-- richer service discovery and config layering
+- richer service discovery

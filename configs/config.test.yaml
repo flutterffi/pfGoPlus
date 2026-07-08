@@ -1,0 +1,17 @@
+app:
+  env: test
+
+http:
+  port: 18080
+
+grpc:
+  port: 19090
+
+database:
+  dsn: ./tmp/pfgo-plus.test.db
+
+logger:
+  level: debug
+
+observability:
+  exporter: stdout

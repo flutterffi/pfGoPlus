@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -71,15 +73,48 @@ type TodoBackendConfig struct {
 }
 
 func Load() (Config, error) {
+	configName := strings.TrimSpace(os.Getenv("PFGO_CONFIG_NAME"))
+	if configName == "" {
+		configName = "config"
+	}
+	configFile := strings.TrimSpace(os.Getenv("PFGO_CONFIG_FILE"))
+	profile := strings.TrimSpace(os.Getenv("PFGO_APP_ENV"))
+
+	return loadWithOptions([]string{"./configs", "."}, configName, configFile, profile)
+}
+
+func loadWithOptions(paths []string, configName, configFile, profile string) (Config, error) {
 	v := viper.New()
-	v.SetConfigName("config")
 	v.SetConfigType("yaml")
-	v.AddConfigPath("./configs")
-	v.AddConfigPath(".")
 	v.SetEnvPrefix("PFGO")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
+	setDefaults(v)
+
+	if err := readBaseConfig(v, paths, configName, configFile); err != nil {
+		return Config{}, err
+	}
+
+	activeProfile := strings.TrimSpace(profile)
+	if activeProfile == "" {
+		activeProfile = strings.TrimSpace(v.GetString("app.env"))
+	}
+	if activeProfile != "" {
+		if err := mergeProfileConfig(v, paths, configName, activeProfile); err != nil {
+			return Config{}, err
+		}
+	}
+
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		return Config{}, fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.name", "pfGoPlus")
 	v.SetDefault("app.env", "local")
 	v.SetDefault("http.host", "0.0.0.0")
@@ -107,15 +142,50 @@ func Load() (Config, error) {
 	v.SetDefault("observability.otlp_insecure", true)
 	v.SetDefault("observability.service_version", "v0.3.0")
 	v.SetDefault("todo_backend.mode", "local")
+}
+
+func readBaseConfig(v *viper.Viper, paths []string, configName, configFile string) error {
+	if configFile != "" {
+		v.SetConfigFile(configFile)
+		if err := v.ReadInConfig(); err != nil {
+			return fmt.Errorf("read config file %s: %w", configFile, err)
+		}
+		return nil
+	}
+
+	v.SetConfigName(configName)
+	for _, path := range paths {
+		v.AddConfigPath(path)
+	}
 
 	if err := v.ReadInConfig(); err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		var notFound viper.ConfigFileNotFoundError
+		if errors.As(err, &notFound) {
+			return nil
+		}
+		return fmt.Errorf("read config: %w", err)
+	}
+	return nil
+}
+
+func mergeProfileConfig(v *viper.Viper, paths []string, configName, profile string) error {
+	profileConfig := viper.New()
+	profileConfig.SetConfigType("yaml")
+	profileConfig.SetConfigName(fmt.Sprintf("%s.%s", configName, profile))
+	for _, path := range paths {
+		profileConfig.AddConfigPath(path)
 	}
 
-	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return Config{}, fmt.Errorf("unmarshal config: %w", err)
+	if err := profileConfig.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if errors.As(err, &notFound) {
+			return nil
+		}
+		return fmt.Errorf("read profile config %s.%s: %w", configName, profile, err)
 	}
 
-	return cfg, nil
+	if err := v.MergeConfigMap(profileConfig.AllSettings()); err != nil {
+		return fmt.Errorf("merge profile config %s.%s: %w", configName, profile, err)
+	}
+	return nil
 }
