@@ -32,7 +32,7 @@ func InitializeHTTPApp() (*app.HTTPApp, error) {
 	}
 	repository := NewUserRepository(db)
 	roleRepository := NewRoleRepository(db)
-	service, err := NewRoleService(roleRepository)
+	service, err := NewRoleService(roleRepository, repository)
 	if err != nil {
 		return nil, err
 	}

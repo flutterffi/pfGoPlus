@@ -9,6 +9,10 @@ type stubRepository struct {
 	items []Role
 }
 
+type stubUsageCounter struct {
+	counts map[string]int64
+}
+
 func (s *stubRepository) Create(_ context.Context, item *Role) error {
 	item.ID = uint(len(s.items) + 1)
 	s.items = append(s.items, *item)
@@ -41,9 +45,13 @@ func (s *stubRepository) Update(_ context.Context, item *Role) error {
 	return nil
 }
 
+func (s *stubUsageCounter) CountByRole(_ context.Context, role string) (int64, error) {
+	return s.counts[role], nil
+}
+
 func TestEnsureDefaultsSeedsRoles(t *testing.T) {
 	repo := &stubRepository{}
-	service := NewService(repo)
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
 
 	if err := service.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure defaults: %v", err)
@@ -55,7 +63,7 @@ func TestEnsureDefaultsSeedsRoles(t *testing.T) {
 
 func TestResolvePermissions(t *testing.T) {
 	repo := &stubRepository{}
-	service := NewService(repo)
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
 	if err := service.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure defaults: %v", err)
 	}
@@ -71,7 +79,7 @@ func TestResolvePermissions(t *testing.T) {
 
 func TestUpdateRolePermissions(t *testing.T) {
 	repo := &stubRepository{}
-	service := NewService(repo)
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
 	if err := service.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure defaults: %v", err)
 	}
@@ -91,7 +99,7 @@ func TestUpdateRolePermissions(t *testing.T) {
 
 func TestUpdateAdminRoleKeepsCorePermissions(t *testing.T) {
 	repo := &stubRepository{}
-	service := NewService(repo)
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
 	if err := service.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure defaults: %v", err)
 	}
@@ -101,5 +109,36 @@ func TestUpdateAdminRoleKeepsCorePermissions(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected admin core permissions validation error")
+	}
+}
+
+func TestCreateRoleSuccess(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
+
+	item, err := service.Create(context.Background(), CreateRequest{
+		Name:        "auditor",
+		DisplayName: "Auditor",
+		Permissions: []string{"audit:read"},
+	})
+	if err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+	if item.Name != "auditor" {
+		t.Fatalf("unexpected role name: %s", item.Name)
+	}
+}
+
+func TestDisableRoleBlockedWhenAssigned(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{NameMember: 2}})
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure defaults: %v", err)
+	}
+
+	status := StatusDisabled
+	_, err := service.Update(context.Background(), NameMember, UpdateRequest{Status: &status})
+	if err == nil {
+		t.Fatal("expected assigned role disable error")
 	}
 }

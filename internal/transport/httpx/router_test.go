@@ -305,6 +305,26 @@ func TestAdminCanUpdateRole(t *testing.T) {
 	}
 }
 
+func TestAdminCanCreateRole(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]any{
+		"name":         "auditor",
+		"display_name": "Auditor",
+		"permissions":  []string{"audit:read"},
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/roles", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", recorder.Code)
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -335,7 +355,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	userRepo := &fakeUserRepo{}
 	auditRepo := &fakeAuditRepo{}
 	roleRepo := newFakeRoleRepo()
-	roleService := role.NewService(roleRepo)
+	roleService := role.NewService(roleRepo, userRepo)
 	if err := roleService.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure default roles: %v", err)
 	}
@@ -432,7 +452,7 @@ func newMemberRouter(t *testing.T) http.Handler {
 	userRepo := &fakeUserRepo{}
 	auditRepo := &fakeAuditRepo{}
 	roleRepo := newFakeRoleRepo()
-	roleService := role.NewService(roleRepo)
+	roleService := role.NewService(roleRepo, userRepo)
 	if err := roleService.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure default roles: %v", err)
 	}
@@ -495,6 +515,16 @@ func (f *fakeUserRepo) Create(_ context.Context, item *user.User) error {
 	return nil
 }
 
+func (f *fakeUserRepo) CountByRole(_ context.Context, role string) (int64, error) {
+	var count int64
+	for _, item := range f.items {
+		if item.Role == role {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (f *fakeUserRepo) FindByID(_ context.Context, id uint) (*user.User, error) {
 	for i := range f.items {
 		if f.items[i].ID == id {
@@ -537,6 +567,9 @@ func newFakeRoleRepo() *fakeRoleRepo {
 
 func (f *fakeRoleRepo) Create(_ context.Context, item *role.Role) error {
 	item.ID = uint(len(f.items) + 1)
+	if item.Status == "" {
+		item.Status = role.StatusActive
+	}
 	f.items = append(f.items, *item)
 	return nil
 }

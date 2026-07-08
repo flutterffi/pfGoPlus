@@ -25,6 +25,16 @@ func (s *stubRepository) Create(_ context.Context, item *User) error {
 	return nil
 }
 
+func (s *stubRepository) CountByRole(_ context.Context, role string) (int64, error) {
+	var count int64
+	for _, item := range s.items {
+		if item.Role == role {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *stubRepository) FindByID(_ context.Context, id uint) (*User, error) {
 	for i := range s.items {
 		if s.items[i].ID == id {
@@ -96,7 +106,7 @@ func (s *stubRoleRepo) List(_ context.Context) ([]role.Role, error) {
 func newRoleService(t *testing.T) *role.Service {
 	t.Helper()
 	repo := &stubRoleRepo{}
-	service := role.NewService(repo)
+	service := role.NewService(repo, &stubRepository{})
 	if err := service.EnsureDefaults(context.Background()); err != nil {
 		t.Fatalf("ensure default roles: %v", err)
 	}

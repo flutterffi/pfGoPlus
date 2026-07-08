@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	Create(ctx context.Context, item *User) error
+	CountByRole(ctx context.Context, role string) (int64, error)
 	FindByID(ctx context.Context, id uint) (*User, error)
 	FindByUsername(ctx context.Context, username string) (*User, error)
 	List(ctx context.Context) ([]User, error)
@@ -24,6 +25,12 @@ func NewRepository(db *gorm.DB) *GormRepository {
 
 func (r *GormRepository) Create(ctx context.Context, item *User) error {
 	return r.db.WithContext(ctx).Create(item).Error
+}
+
+func (r *GormRepository) CountByRole(ctx context.Context, role string) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&User{}).Where("role = ?", role).Count(&count).Error
+	return count, err
 }
 
 func (r *GormRepository) FindByID(ctx context.Context, id uint) (*User, error) {

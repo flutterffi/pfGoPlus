@@ -7,6 +7,7 @@ type Role struct {
 	Name        string    `json:"name" gorm:"uniqueIndex;size:64;not null"`
 	DisplayName string    `json:"display_name" gorm:"size:128;not null"`
 	Permissions string    `json:"permissions" gorm:"size:1024;not null"`
+	Status      string    `json:"status" gorm:"size:32;not null"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

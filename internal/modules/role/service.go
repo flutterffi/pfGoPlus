@@ -12,10 +12,14 @@ import (
 const (
 	NameAdmin  = "admin"
 	NameMember = "member"
+
+	StatusActive   = "active"
+	StatusDisabled = "disabled"
 )
 
 type Service struct {
-	repo Repository
+	repo        Repository
+	roleCounter UsageCounter
 }
 
 type Seed struct {
@@ -27,6 +31,17 @@ type Seed struct {
 type UpdateRequest struct {
 	DisplayName *string  `json:"display_name"`
 	Permissions []string `json:"permissions"`
+	Status      *string  `json:"status"`
+}
+
+type CreateRequest struct {
+	Name        string   `json:"name"`
+	DisplayName string   `json:"display_name"`
+	Permissions []string `json:"permissions"`
+}
+
+type UsageCounter interface {
+	CountByRole(ctx context.Context, role string) (int64, error)
 }
 
 func DefaultSeeds() []Seed {
@@ -44,8 +59,8 @@ func DefaultSeeds() []Seed {
 	}
 }
 
-func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository, roleCounter UsageCounter) *Service {
+	return &Service{repo: repo, roleCounter: roleCounter}
 }
 
 func (s *Service) EnsureDefaults(ctx context.Context) error {
@@ -65,6 +80,7 @@ func (s *Service) EnsureDefaults(ctx context.Context) error {
 			Name:        seed.Name,
 			DisplayName: seed.DisplayName,
 			Permissions: string(encoded),
+			Status:      StatusActive,
 		}); err != nil {
 			return httpx.Internal("create default role failed", err)
 		}
@@ -84,6 +100,9 @@ func (s *Service) ResolvePermissions(ctx context.Context, name string) ([]string
 	if err := json.Unmarshal([]byte(item.Permissions), &permissions); err != nil {
 		return nil, httpx.Internal("decode role permissions failed", err)
 	}
+	if item.Status != StatusActive {
+		return nil, httpx.Forbidden("role is disabled", nil)
+	}
 	return permissions, nil
 }
 
@@ -101,6 +120,45 @@ func (s *Service) List(ctx context.Context) ([]Role, error) {
 		return nil, httpx.Internal("list roles failed", err)
 	}
 	return items, nil
+}
+
+func (s *Service) Create(ctx context.Context, req CreateRequest) (*Role, error) {
+	name := strings.ToLower(strings.TrimSpace(req.Name))
+	displayName := strings.TrimSpace(req.DisplayName)
+	if name == "" {
+		return nil, httpx.BadRequest("name is required", nil)
+	}
+	if displayName == "" {
+		displayName = name
+	}
+
+	existing, err := s.repo.FindByName(ctx, name)
+	if err != nil {
+		return nil, httpx.Internal("load role failed", err)
+	}
+	if existing != nil {
+		return nil, httpx.BadRequest("role already exists", nil)
+	}
+
+	permissions, validateErr := normalizePermissions(req.Permissions)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	encoded, err := json.Marshal(permissions)
+	if err != nil {
+		return nil, httpx.Internal("encode role permissions failed", err)
+	}
+
+	item := &Role{
+		Name:        name,
+		DisplayName: displayName,
+		Permissions: string(encoded),
+		Status:      StatusActive,
+	}
+	if err := s.repo.Create(ctx, item); err != nil {
+		return nil, httpx.Internal("create role failed", err)
+	}
+	return item, nil
 }
 
 func (s *Service) Update(ctx context.Context, name string, req UpdateRequest) (*Role, error) {
@@ -139,6 +197,26 @@ func (s *Service) Update(ctx context.Context, name string, req UpdateRequest) (*
 		item.Permissions = string(encoded)
 	}
 
+	if req.Status != nil {
+		status := normalizeStatus(*req.Status)
+		if !isValidStatus(status) {
+			return nil, httpx.BadRequest("status must be active or disabled", nil)
+		}
+		if item.Name == NameAdmin && status != StatusActive {
+			return nil, httpx.BadRequest("admin role cannot be disabled", nil)
+		}
+		if item.Status == StatusActive && status == StatusDisabled && s.roleCounter != nil {
+			count, err := s.roleCounter.CountByRole(ctx, item.Name)
+			if err != nil {
+				return nil, httpx.Internal("count role usage failed", err)
+			}
+			if count > 0 {
+				return nil, httpx.BadRequest("role is assigned to existing users", nil)
+			}
+		}
+		item.Status = status
+	}
+
 	if err := s.repo.Update(ctx, item); err != nil {
 		return nil, httpx.Internal("update role failed", err)
 	}
@@ -164,4 +242,19 @@ func normalizePermissions(values []string) ([]string, error) {
 	}
 	slices.Sort(permissions)
 	return permissions, nil
+}
+
+func normalizeStatus(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", StatusActive:
+		return StatusActive
+	case StatusDisabled:
+		return StatusDisabled
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+}
+
+func isValidStatus(status string) bool {
+	return status == StatusActive || status == StatusDisabled
 }

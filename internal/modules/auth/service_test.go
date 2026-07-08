@@ -16,6 +16,8 @@ type stubUserRepo struct {
 
 func (s *stubUserRepo) Create(context.Context, *user.User) error { return nil }
 
+func (s *stubUserRepo) CountByRole(context.Context, string) (int64, error) { return 0, nil }
+
 func (s *stubUserRepo) FindByID(context.Context, uint) (*user.User, error) { return s.item, nil }
 
 func (s *stubUserRepo) FindByUsername(_ context.Context, username string) (*user.User, error) {
@@ -37,7 +39,7 @@ func newTestService(t *testing.T) *Service {
 	}
 
 	roleRepo := &stubRoleRepo{items: []role.Role{
-		{Name: role.NameAdmin, Permissions: `["users:read","users:write","audit:read","roles:read","roles:write","todos:read","todos:write"]`},
+		{Name: role.NameAdmin, Permissions: `["users:read","users:write","audit:read","roles:read","roles:write","todos:read","todos:write"]`, Status: role.StatusActive},
 	}}
 
 	return NewService(config.AuthConfig{
@@ -51,7 +53,7 @@ func newTestService(t *testing.T) *Service {
 		PasswordHash: hash,
 		Role:         user.RoleAdmin,
 		Status:       user.StatusActive,
-	}}, role.NewService(roleRepo))
+	}}, role.NewService(roleRepo, &stubUserRepo{}))
 }
 
 type stubRoleRepo struct {

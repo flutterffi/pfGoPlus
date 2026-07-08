@@ -24,6 +24,7 @@ func NewHandler(service *Service, readz gin.HandlerFunc, writez gin.HandlerFunc)
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	roles := group.Group("/roles")
 	roles.GET("", h.readz, h.List)
+	roles.POST("", h.writez, h.Create)
 	roles.PATCH("/:name", h.writez, h.Update)
 }
 
@@ -71,6 +72,34 @@ func (h *Handler) Update(c *gin.Context) {
 			"name":         item.Name,
 			"display_name": item.DisplayName,
 			"permissions":  permissions,
+			"created_at":   item.CreatedAt,
+			"updated_at":   item.UpdatedAt,
+		},
+	})
+}
+
+func (h *Handler) Create(c *gin.Context) {
+	var req CreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(httpx.BadRequest("invalid request body", err))
+		return
+	}
+
+	item, err := h.service.Create(c.Request.Context(), req)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	var permissions []string
+	_ = json.Unmarshal([]byte(item.Permissions), &permissions)
+	httpx.Success(c, 201, "role created", gin.H{
+		"role": gin.H{
+			"id":           item.ID,
+			"name":         item.Name,
+			"display_name": item.DisplayName,
+			"permissions":  permissions,
+			"status":       item.Status,
 			"created_at":   item.CreatedAt,
 			"updated_at":   item.UpdatedAt,
 		},

@@ -60,8 +60,8 @@ func NewRoleRepository(db *gorm.DB) role.Repository {
 	return role.NewRepository(db)
 }
 
-func NewRoleService(repo role.Repository) (*role.Service, error) {
-	service := role.NewService(repo)
+func NewRoleService(repo role.Repository, users user.Repository) (*role.Service, error) {
+	service := role.NewService(repo, users)
 	if err := service.EnsureDefaults(context.Background()); err != nil {
 		return nil, err
 	}
