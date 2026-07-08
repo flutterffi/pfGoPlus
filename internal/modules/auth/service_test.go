@@ -1,24 +1,52 @@
 package auth
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 )
 
-func newTestService() *Service {
+type stubUserRepo struct {
+	item *user.User
+}
+
+func (s *stubUserRepo) Create(context.Context, *user.User) error { return nil }
+
+func (s *stubUserRepo) FindByUsername(_ context.Context, username string) (*user.User, error) {
+	if s.item != nil && s.item.Username == username {
+		return s.item, nil
+	}
+	return nil, nil
+}
+
+func (s *stubUserRepo) List(context.Context) ([]user.User, error) { return nil, nil }
+
+func newTestService(t *testing.T) *Service {
+	t.Helper()
+	hash, err := user.HashPassword("admin123")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+
 	return NewService(config.AuthConfig{
 		JWTSecret:      "test-secret",
 		JWTIssuer:      "pfGoPlus-test",
 		AccessTokenTTL: time.Hour,
-		DemoUsername:   "admin",
-		DemoPassword:   "admin123",
-	})
+	}, &stubUserRepo{item: &user.User{
+		ID:           1,
+		Username:     "admin",
+		DisplayName:  "Admin",
+		PasswordHash: hash,
+		Role:         user.RoleAdmin,
+		Status:       user.StatusActive,
+	}})
 }
 
 func TestLoginSuccess(t *testing.T) {
-	service := newTestService()
+	service := newTestService(t)
 
 	result, err := service.Login(LoginRequest{
 		Username: "admin",
@@ -33,7 +61,7 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestParseTokenSuccess(t *testing.T) {
-	service := newTestService()
+	service := newTestService(t)
 
 	result, err := service.Login(LoginRequest{
 		Username: "admin",
@@ -49,5 +77,8 @@ func TestParseTokenSuccess(t *testing.T) {
 	}
 	if claims.Username != "admin" {
 		t.Fatalf("unexpected username: %s", claims.Username)
+	}
+	if claims.Role != user.RoleAdmin {
+		t.Fatalf("unexpected role: %s", claims.Role)
 	}
 }

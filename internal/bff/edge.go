@@ -4,6 +4,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
+	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"github.com/gin-gonic/gin"
@@ -12,14 +13,16 @@ import (
 type Edge struct {
 	cfg         config.Config
 	authHandler *auth.Handler
+	userHandler *user.Handler
 	todoHandler *todo.Handler
 	telemetry   *telemetry.Provider
 }
 
-func New(cfg config.Config, authHandler *auth.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *Edge {
+func New(cfg config.Config, authHandler *auth.Handler, userHandler *user.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *Edge {
 	return &Edge{
 		cfg:         cfg,
 		authHandler: authHandler,
+		userHandler: userHandler,
 		todoHandler: todoHandler,
 		telemetry:   telemetryProvider,
 	}
@@ -32,6 +35,7 @@ func (e *Edge) Compose(router *gin.Engine) {
 
 	v1 := router.Group("/api/v1")
 	e.authHandler.RegisterRoutes(v1)
+	e.userHandler.RegisterRoutes(v1)
 	e.todoHandler.RegisterRoutes(v1)
 	v1.GET("/meta", e.Meta)
 }

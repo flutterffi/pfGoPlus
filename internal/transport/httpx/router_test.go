@@ -13,6 +13,7 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
 	"github.com/flutterffi/pfGoPlus/internal/modules/todo"
+	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/platform/telemetry"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"go.uber.org/zap"
@@ -113,6 +114,41 @@ func TestCreateTodoEndpoint(t *testing.T) {
 	}
 }
 
+func TestCurrentUserEndpoint(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/me", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+}
+
+func TestAdminCanCreateUser(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]string{
+		"username":     "alice",
+		"display_name": "Alice",
+		"password":     "secret123",
+		"role":         "member",
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/users", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", recorder.Code)
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -140,11 +176,17 @@ func newTestRouter(t *testing.T) http.Handler {
 			Mode: "local",
 		},
 	}
-	authService := auth.NewService(cfg.Auth)
+	userRepo := &fakeUserRepo{}
+	userService, err := user.NewService(cfg.Auth, userRepo)
+	if err != nil {
+		t.Fatalf("new user service: %v", err)
+	}
+	authService := auth.NewService(cfg.Auth, userRepo)
 	authHandler := auth.NewHandler(authService)
+	userHandler := user.NewHandler(userService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
 	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
 	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
-	edge := bff.New(cfg, authHandler, todoHandler, telemetryProvider)
+	edge := bff.New(cfg, authHandler, userHandler, todoHandler, telemetryProvider)
 	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
 }
 
@@ -189,4 +231,30 @@ func (f *fakeTodoRepo) Create(_ context.Context, item *todo.Todo) error {
 
 func (f *fakeTodoRepo) List(_ context.Context) ([]todo.Todo, error) {
 	return []todo.Todo{}, nil
+}
+
+type fakeUserRepo struct {
+	items []user.User
+}
+
+func (f *fakeUserRepo) Create(_ context.Context, item *user.User) error {
+	item.ID = uint(len(f.items) + 1)
+	f.items = append(f.items, *item)
+	return nil
+}
+
+func (f *fakeUserRepo) FindByUsername(_ context.Context, username string) (*user.User, error) {
+	for i := range f.items {
+		if f.items[i].Username == username {
+			item := f.items[i]
+			return &item, nil
+		}
+	}
+	return nil, nil
+}
+
+func (f *fakeUserRepo) List(_ context.Context) ([]user.User, error) {
+	items := make([]user.User, len(f.items))
+	copy(items, f.items)
+	return items, nil
 }

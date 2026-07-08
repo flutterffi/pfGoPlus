@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/flutterffi/pfGoPlus/internal/config"
+	"github.com/flutterffi/pfGoPlus/internal/modules/user"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -14,8 +16,7 @@ type Service struct {
 	secret   []byte
 	issuer   string
 	tokenTTL time.Duration
-	username string
-	password string
+	users    user.Repository
 }
 
 type LoginRequest struct {
@@ -30,17 +31,19 @@ type LoginResult struct {
 }
 
 type Claims struct {
-	Username string `json:"username"`
+	UserID      uint   `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Role        string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func NewService(cfg config.AuthConfig) *Service {
+func NewService(cfg config.AuthConfig, users user.Repository) *Service {
 	return &Service{
 		secret:   []byte(cfg.JWTSecret),
 		issuer:   cfg.JWTIssuer,
 		tokenTTL: cfg.AccessTokenTTL,
-		username: cfg.DemoUsername,
-		password: cfg.DemoPassword,
+		users:    users,
 	}
 }
 
@@ -51,16 +54,27 @@ func (s *Service) Login(req LoginRequest) (*LoginResult, error) {
 	if username == "" || password == "" {
 		return nil, httpx.BadRequest("username and password are required", nil)
 	}
-	if username != s.username || password != s.password {
+
+	item, err := s.users.FindByUsername(context.Background(), username)
+	if err != nil {
+		return nil, httpx.Internal("load user failed", err)
+	}
+	if item == nil || !user.CheckPassword(item.PasswordHash, password) {
 		return nil, httpx.Unauthorized("invalid username or password", nil)
+	}
+	if item.Status != user.StatusActive {
+		return nil, httpx.Unauthorized("user is disabled", nil)
 	}
 
 	expiresAt := time.Now().Add(s.tokenTTL)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
-		Username: username,
+		UserID:      item.ID,
+		Username:    item.Username,
+		DisplayName: item.DisplayName,
+		Role:        item.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
-			Subject:   username,
+			Subject:   item.Username,
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},

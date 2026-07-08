@@ -7,41 +7,84 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const authUserKey = "auth_user"
+const (
+	authUserKey        = "auth_user"
+	authUserIDKey      = "auth_user_id"
+	authUsernameKey    = "auth_username"
+	authDisplayNameKey = "auth_display_name"
+	authRoleKey        = "auth_role"
+)
 
 func RequireAuth(service *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := strings.TrimSpace(c.GetHeader("Authorization"))
-		if header == "" {
-			_ = c.Error(httpx.Unauthorized("missing authorization header", nil))
-			c.Abort()
-			return
-		}
-
-		parts := strings.SplitN(header, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			_ = c.Error(httpx.Unauthorized("invalid authorization header", nil))
-			c.Abort()
-			return
-		}
-
-		claims, err := service.ParseToken(strings.TrimSpace(parts[1]))
+		claims, err := authenticate(service, c)
 		if err != nil {
 			_ = c.Error(err)
 			c.Abort()
 			return
 		}
 
-		c.Set(authUserKey, claims.Username)
+		c.Set(authUserKey, claims)
+		c.Set(authUserIDKey, claims.UserID)
+		c.Set(authUsernameKey, claims.Username)
+		c.Set(authDisplayNameKey, claims.DisplayName)
+		c.Set(authRoleKey, claims.Role)
 		c.Next()
 	}
 }
 
-func CurrentUser(c *gin.Context) string {
+func RequireRole(service *Service, roles ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, err := authenticate(service, c)
+		if err != nil {
+			_ = c.Error(err)
+			c.Abort()
+			return
+		}
+		c.Set(authUserKey, claims)
+		c.Set(authUserIDKey, claims.UserID)
+		c.Set(authUsernameKey, claims.Username)
+		c.Set(authDisplayNameKey, claims.DisplayName)
+		c.Set(authRoleKey, claims.Role)
+		for _, role := range roles {
+			if strings.EqualFold(claims.Role, role) {
+				c.Next()
+				return
+			}
+		}
+
+		_ = c.Error(httpx.Unauthorized("insufficient permissions", nil))
+		c.Abort()
+	}
+}
+
+func CurrentClaims(c *gin.Context) *Claims {
 	value, ok := c.Get(authUserKey)
 	if !ok {
+		return nil
+	}
+	claims, _ := value.(*Claims)
+	return claims
+}
+
+func CurrentUser(c *gin.Context) string {
+	claims := CurrentClaims(c)
+	if claims == nil {
 		return ""
 	}
-	username, _ := value.(string)
-	return username
+	return claims.Username
+}
+
+func authenticate(service *Service, c *gin.Context) (*Claims, error) {
+	header := strings.TrimSpace(c.GetHeader("Authorization"))
+	if header == "" {
+		return nil, httpx.Unauthorized("missing authorization header", nil)
+	}
+
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return nil, httpx.Unauthorized("invalid authorization header", nil)
+	}
+
+	return service.ParseToken(strings.TrimSpace(parts[1]))
 }

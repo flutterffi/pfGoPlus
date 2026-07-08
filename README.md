@@ -80,6 +80,9 @@ Open:
 - `POST /api/v1/auth/login`
 - `GET /api/v1/todos` (requires Bearer token)
 - `POST /api/v1/todos` (requires Bearer token)
+- `GET /api/v1/users/me` (requires Bearer token)
+- `GET /api/v1/users` (admin only)
+- `POST /api/v1/users` (admin only)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 - Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
@@ -113,6 +116,7 @@ pfGoPlus/
   internal/app/               # bootstrap and lifecycle
   internal/config/            # config model and loader
   internal/modules/auth/      # JWT login and auth middleware
+  internal/modules/user/      # user identity and RBAC module
   internal/modules/todo/      # demo business module
   internal/platform/          # database, logger, telemetry
   internal/transport/httpx/   # HTTP transport and middleware
@@ -149,6 +153,7 @@ Current milestone:
 - OTLP exporter support for traces and metrics
 - local Docker Compose stack with gRPC, OTEL Collector, and Prometheus
 - layered config loading via base, profile, and env overrides
+- persisted user module with RBAC-aware auth and admin APIs
 
 Next milestone:
 
