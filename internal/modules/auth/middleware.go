@@ -53,7 +53,7 @@ func RequireRole(service *Service, roles ...string) gin.HandlerFunc {
 			}
 		}
 
-		_ = c.Error(httpx.Unauthorized("insufficient permissions", nil))
+		_ = c.Error(httpx.Forbidden("insufficient permissions", nil))
 		c.Abort()
 	}
 }

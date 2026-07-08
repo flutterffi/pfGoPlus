@@ -2,6 +2,7 @@ package user
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,7 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	users.GET("/me", h.Me)
 	users.GET("", h.adminz, h.List)
 	users.POST("", h.adminz, h.Create)
+	users.PATCH("/:id", h.adminz, h.Update)
 }
 
 func (h *Handler) Me(c *gin.Context) {
@@ -54,15 +56,8 @@ func (h *Handler) List(c *gin.Context) {
 
 	response := make([]gin.H, 0, len(items))
 	for _, item := range items {
-		response = append(response, gin.H{
-			"id":           item.ID,
-			"username":     item.Username,
-			"display_name": item.DisplayName,
-			"role":         item.Role,
-			"status":       item.Status,
-			"created_at":   item.CreatedAt,
-			"updated_at":   item.UpdatedAt,
-		})
+		copyItem := item
+		response = append(response, presentUser(&copyItem))
 	}
 	httpx.OK(c, gin.H{"items": response})
 }
@@ -81,14 +76,45 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	httpx.Success(c, http.StatusCreated, "user created", gin.H{
-		"user": gin.H{
-			"id":           item.ID,
-			"username":     item.Username,
-			"display_name": item.DisplayName,
-			"role":         item.Role,
-			"status":       item.Status,
-			"created_at":   item.CreatedAt,
-			"updated_at":   item.UpdatedAt,
-		},
+		"user": presentUser(item),
 	})
+}
+
+func (h *Handler) Update(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		_ = c.Error(httpx.BadRequest("invalid user id", err))
+		return
+	}
+
+	var req UpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(httpx.BadRequest("invalid request body", err))
+		return
+	}
+
+	actorID, _ := c.Get("auth_user_id")
+	currentActorID, _ := actorID.(uint)
+
+	item, updateErr := h.service.Update(c.Request.Context(), uint(id), req, currentActorID)
+	if updateErr != nil {
+		_ = c.Error(updateErr)
+		return
+	}
+
+	httpx.OK(c, gin.H{
+		"user": presentUser(item),
+	})
+}
+
+func presentUser(item *User) gin.H {
+	return gin.H{
+		"id":           item.ID,
+		"username":     item.Username,
+		"display_name": item.DisplayName,
+		"role":         item.Role,
+		"status":       item.Status,
+		"created_at":   item.CreatedAt,
+		"updated_at":   item.UpdatedAt,
+	}
 }

@@ -149,6 +149,50 @@ func TestAdminCanCreateUser(t *testing.T) {
 	}
 }
 
+func TestAdminCanDisableUser(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]string{
+		"username":     "alice",
+		"display_name": "Alice",
+		"password":     "secret123",
+		"role":         "member",
+	})
+	createRequest := httptest.NewRequest(http.MethodPost, "/api/v1/users", bytes.NewReader(body))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", "Bearer "+token)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+
+	patchBody, _ := json.Marshal(map[string]string{
+		"status": "disabled",
+	})
+	request := httptest.NewRequest(http.MethodPatch, "/api/v1/users/2", bytes.NewReader(patchBody))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+}
+
+func TestMemberCannotListUsers(t *testing.T) {
+	router := newMemberRouter(t)
+	token := loginTokenWithCredentials(t, router, "member", "member123")
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", recorder.Code)
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -192,10 +236,15 @@ func newTestRouter(t *testing.T) http.Handler {
 
 func loginToken(t *testing.T, router http.Handler) string {
 	t.Helper()
+	return loginTokenWithCredentials(t, router, "admin", "admin123")
+}
+
+func loginTokenWithCredentials(t *testing.T, router http.Handler, username, password string) string {
+	t.Helper()
 
 	body, _ := json.Marshal(map[string]string{
-		"username": "admin",
-		"password": "admin123",
+		"username": username,
+		"password": password,
 	})
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
@@ -222,6 +271,55 @@ func loginToken(t *testing.T, router http.Handler) string {
 	return response.Data.Token.AccessToken
 }
 
+func newMemberRouter(t *testing.T) http.Handler {
+	t.Helper()
+
+	cfg := config.Config{
+		App: config.AppConfig{
+			Name: "pfGoPlus-test",
+			Env:  "test",
+		},
+		GRPC: config.GRPCConfig{
+			ClientTarget: "127.0.0.1:9090",
+		},
+		Auth: config.AuthConfig{
+			JWTSecret:      "test-secret",
+			JWTIssuer:      "pfGoPlus-test",
+			AccessTokenTTL: time.Hour,
+			DemoUsername:   "admin",
+			DemoPassword:   "admin123",
+		},
+		Observability: config.ObservabilityConfig{
+			Exporter:       "stdout",
+			MetricsPath:    "/metrics",
+			ServiceVersion: "test-version",
+		},
+		TodoBackend: config.TodoBackendConfig{
+			Mode: "local",
+		},
+	}
+	userRepo := &fakeUserRepo{}
+	userService, err := user.NewService(cfg.Auth, userRepo)
+	if err != nil {
+		t.Fatalf("new user service: %v", err)
+	}
+	if _, err := userService.Create(context.Background(), user.CreateRequest{
+		Username:    "member",
+		DisplayName: "Member",
+		Password:    "member123",
+		Role:        user.RoleMember,
+	}); err != nil {
+		t.Fatalf("seed member user: %v", err)
+	}
+	authService := auth.NewService(cfg.Auth, userRepo)
+	authHandler := auth.NewHandler(authService)
+	userHandler := user.NewHandler(userService, auth.RequireAuth(authService), auth.RequireRole(authService, user.RoleAdmin))
+	todoHandler := todo.NewHandler(todo.NewHTTPAdapter(todo.NewService(&fakeTodoRepo{})), auth.RequireAuth(authService))
+	telemetryProvider := telemetry.NewNoop("pfGoPlus-test")
+	edge := bff.New(cfg, authHandler, userHandler, todoHandler, telemetryProvider)
+	return httpx.NewRouter(zap.NewNop(), telemetryProvider, edge)
+}
+
 type fakeTodoRepo struct{}
 
 func (f *fakeTodoRepo) Create(_ context.Context, item *todo.Todo) error {
@@ -243,6 +341,16 @@ func (f *fakeUserRepo) Create(_ context.Context, item *user.User) error {
 	return nil
 }
 
+func (f *fakeUserRepo) FindByID(_ context.Context, id uint) (*user.User, error) {
+	for i := range f.items {
+		if f.items[i].ID == id {
+			item := f.items[i]
+			return &item, nil
+		}
+	}
+	return nil, nil
+}
+
 func (f *fakeUserRepo) FindByUsername(_ context.Context, username string) (*user.User, error) {
 	for i := range f.items {
 		if f.items[i].Username == username {
@@ -257,4 +365,14 @@ func (f *fakeUserRepo) List(_ context.Context) ([]user.User, error) {
 	items := make([]user.User, len(f.items))
 	copy(items, f.items)
 	return items, nil
+}
+
+func (f *fakeUserRepo) Update(_ context.Context, item *user.User) error {
+	for i := range f.items {
+		if f.items[i].ID == item.ID {
+			f.items[i] = *item
+			return nil
+		}
+	}
+	return nil
 }

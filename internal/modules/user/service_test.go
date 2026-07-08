@@ -20,6 +20,16 @@ func (s *stubRepository) Create(_ context.Context, item *User) error {
 	return nil
 }
 
+func (s *stubRepository) FindByID(_ context.Context, id uint) (*User, error) {
+	for i := range s.items {
+		if s.items[i].ID == id {
+			item := s.items[i]
+			return &item, nil
+		}
+	}
+	return nil, nil
+}
+
 func (s *stubRepository) FindByUsername(_ context.Context, username string) (*User, error) {
 	for i := range s.items {
 		if s.items[i].Username == username {
@@ -34,6 +44,17 @@ func (s *stubRepository) List(_ context.Context) ([]User, error) {
 	items := make([]User, len(s.items))
 	copy(items, s.items)
 	return items, nil
+}
+
+func (s *stubRepository) Update(_ context.Context, item *User) error {
+	for i := range s.items {
+		if s.items[i].ID == item.ID {
+			item.UpdatedAt = time.Date(2026, 1, 2, 4, 5, 6, 0, time.UTC)
+			s.items[i] = *item
+			return nil
+		}
+	}
+	return nil
 }
 
 func TestNewServiceSeedsBootstrapAdmin(t *testing.T) {
@@ -81,5 +102,50 @@ func TestCreateUserSuccess(t *testing.T) {
 	}
 	if item.PasswordHash == "secret123" {
 		t.Fatal("expected password to be hashed")
+	}
+}
+
+func TestUpdateUserDisableSuccess(t *testing.T) {
+	repo := &stubRepository{items: []User{{
+		ID:           1,
+		Username:     "alice",
+		DisplayName:  "Alice",
+		PasswordHash: "hashed",
+		Role:         RoleMember,
+		Status:       StatusActive,
+	}}}
+	service, err := NewService(config.AuthConfig{}, repo)
+	if err != nil {
+		t.Fatalf("new user service: %v", err)
+	}
+
+	status := StatusDisabled
+	item, err := service.Update(context.Background(), 1, UpdateRequest{Status: &status}, 99)
+	if err != nil {
+		t.Fatalf("update user: %v", err)
+	}
+	if item.Status != StatusDisabled {
+		t.Fatalf("expected disabled status, got %s", item.Status)
+	}
+}
+
+func TestUpdateUserCannotDisableSelf(t *testing.T) {
+	repo := &stubRepository{items: []User{{
+		ID:           1,
+		Username:     "admin",
+		DisplayName:  "Admin",
+		PasswordHash: "hashed",
+		Role:         RoleAdmin,
+		Status:       StatusActive,
+	}}}
+	service, err := NewService(config.AuthConfig{}, repo)
+	if err != nil {
+		t.Fatalf("new user service: %v", err)
+	}
+
+	status := StatusDisabled
+	_, err = service.Update(context.Background(), 1, UpdateRequest{Status: &status}, 1)
+	if err == nil {
+		t.Fatal("expected self-disable error")
 	}
 }

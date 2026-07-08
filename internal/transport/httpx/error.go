@@ -48,6 +48,10 @@ func Unauthorized(message string, err error) *AppError {
 	return NewError(http.StatusUnauthorized, 401000, message, err)
 }
 
+func Forbidden(message string, err error) *AppError {
+	return NewError(http.StatusForbidden, 403000, message, err)
+}
+
 func Internal(message string, err error) *AppError {
 	return NewError(http.StatusInternalServerError, 500000, message, err)
 }

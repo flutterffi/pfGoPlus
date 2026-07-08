@@ -83,6 +83,7 @@ Open:
 - `GET /api/v1/users/me` (requires Bearer token)
 - `GET /api/v1/users` (admin only)
 - `POST /api/v1/users` (admin only)
+- `PATCH /api/v1/users/:id` (admin only, update role/status/profile/password)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 - Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
@@ -154,6 +155,7 @@ Current milestone:
 - local Docker Compose stack with gRPC, OTEL Collector, and Prometheus
 - layered config loading via base, profile, and env overrides
 - persisted user module with RBAC-aware auth and admin APIs
+- user lifecycle management with update and disable flows
 
 Next milestone:
 

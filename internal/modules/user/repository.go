@@ -8,8 +8,10 @@ import (
 
 type Repository interface {
 	Create(ctx context.Context, item *User) error
+	FindByID(ctx context.Context, id uint) (*User, error)
 	FindByUsername(ctx context.Context, username string) (*User, error)
 	List(ctx context.Context) ([]User, error)
+	Update(ctx context.Context, item *User) error
 }
 
 type GormRepository struct {
@@ -22,6 +24,18 @@ func NewRepository(db *gorm.DB) *GormRepository {
 
 func (r *GormRepository) Create(ctx context.Context, item *User) error {
 	return r.db.WithContext(ctx).Create(item).Error
+}
+
+func (r *GormRepository) FindByID(ctx context.Context, id uint) (*User, error) {
+	var item User
+	err := r.db.WithContext(ctx).Where("id = ?", id).Take(&item).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &item, nil
 }
 
 func (r *GormRepository) FindByUsername(ctx context.Context, username string) (*User, error) {
@@ -40,4 +54,8 @@ func (r *GormRepository) List(ctx context.Context) ([]User, error) {
 	var items []User
 	err := r.db.WithContext(ctx).Order("id asc").Find(&items).Error
 	return items, err
+}
+
+func (r *GormRepository) Update(ctx context.Context, item *User) error {
+	return r.db.WithContext(ctx).Save(item).Error
 }

@@ -15,6 +15,8 @@ type stubUserRepo struct {
 
 func (s *stubUserRepo) Create(context.Context, *user.User) error { return nil }
 
+func (s *stubUserRepo) FindByID(context.Context, uint) (*user.User, error) { return s.item, nil }
+
 func (s *stubUserRepo) FindByUsername(_ context.Context, username string) (*user.User, error) {
 	if s.item != nil && s.item.Username == username {
 		return s.item, nil
@@ -23,6 +25,8 @@ func (s *stubUserRepo) FindByUsername(_ context.Context, username string) (*user
 }
 
 func (s *stubUserRepo) List(context.Context) ([]user.User, error) { return nil, nil }
+
+func (s *stubUserRepo) Update(context.Context, *user.User) error { return nil }
 
 func newTestService(t *testing.T) *Service {
 	t.Helper()
