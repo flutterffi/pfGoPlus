@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flutterffi/pfGoPlus/internal/modules/rbac"
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
 )
 
@@ -35,9 +36,10 @@ type UpdateRequest struct {
 }
 
 type CreateRequest struct {
-	Name        string   `json:"name"`
-	DisplayName string   `json:"display_name"`
-	Permissions []string `json:"permissions"`
+	Name         string   `json:"name"`
+	DisplayName  string   `json:"display_name"`
+	TemplateName string   `json:"template_name"`
+	Permissions  []string `json:"permissions"`
 }
 
 type UsageCounter interface {
@@ -140,7 +142,15 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*Role, error) 
 		return nil, httpx.BadRequest("role already exists", nil)
 	}
 
-	permissions, validateErr := normalizePermissions(req.Permissions)
+	var (
+		permissions []string
+		validateErr error
+	)
+	if len(req.Permissions) == 0 {
+		permissions, validateErr = resolveTemplatePermissions(req.TemplateName)
+	} else {
+		permissions, validateErr = normalizePermissions(req.Permissions)
+	}
 	if validateErr != nil {
 		return nil, validateErr
 	}
@@ -250,6 +260,20 @@ func (s *Service) Delete(ctx context.Context, name string) error {
 		return httpx.Internal("delete role failed", err)
 	}
 	return nil
+}
+
+func resolveTemplatePermissions(templateName string) ([]string, error) {
+	templateName = strings.ToLower(strings.TrimSpace(templateName))
+	if templateName == "" {
+		return nil, httpx.BadRequest("permissions cannot be empty", nil)
+	}
+	template, ok := rbac.RoleTemplateByKey(templateName)
+	if !ok {
+		return nil, httpx.BadRequest("role template not found", nil)
+	}
+	permissions := make([]string, len(template.Permissions))
+	copy(permissions, template.Permissions)
+	return permissions, nil
 }
 
 func normalizePermissions(values []string) ([]string, error) {

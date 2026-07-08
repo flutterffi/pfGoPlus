@@ -89,7 +89,7 @@ Open:
   supports `actor_username`, `action`, `resource`, `status`, `trace_id`, `limit`, `offset`
 - `GET /api/v1/roles` (admin only)
 - `PATCH /api/v1/roles/:name` (admin only, update display name, permissions, and status)
-- `POST /api/v1/roles` (admin only, create role)
+- `POST /api/v1/roles` (admin only, create role, supports `template_name` for role bootstrap)
 - `DELETE /api/v1/roles/:name` (admin only, delete disabled custom role)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
@@ -173,6 +173,7 @@ Current milestone:
 - role lifecycle management with create and disable protections
 - role deletion workflow with system-role and assignment safeguards
 - permission catalog metadata endpoint with groups and default role templates
+- template-based role creation flow for admin role management UIs
 
 Next milestone:
 

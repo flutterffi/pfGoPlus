@@ -396,6 +396,40 @@ func TestAdminCanCreateRole(t *testing.T) {
 	}
 }
 
+func TestAdminCanCreateRoleFromTemplate(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]any{
+		"name":          "operator",
+		"display_name":  "Operator",
+		"template_name": "member",
+	})
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/roles", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", recorder.Code)
+	}
+
+	var response struct {
+		Data struct {
+			Role struct {
+				Permissions []string `json:"permissions"`
+			} `json:"role"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal role response: %v", err)
+	}
+	if len(response.Data.Role.Permissions) != 2 {
+		t.Fatalf("expected member template permissions, got %d", len(response.Data.Role.Permissions))
+	}
+}
+
 func TestAdminCanDeleteDisabledRole(t *testing.T) {
 	router := newTestRouter(t)
 	token := loginToken(t, router)

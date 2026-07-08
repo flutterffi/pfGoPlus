@@ -139,6 +139,28 @@ func TestCreateRoleSuccess(t *testing.T) {
 	}
 }
 
+func TestCreateRoleFromTemplateSuccess(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
+
+	item, err := service.Create(context.Background(), CreateRequest{
+		Name:         "operator",
+		DisplayName:  "Operator",
+		TemplateName: "member",
+	})
+	if err != nil {
+		t.Fatalf("create role from template: %v", err)
+	}
+
+	permissions, err := service.ResolvePermissions(context.Background(), item.Name)
+	if err != nil {
+		t.Fatalf("resolve permissions: %v", err)
+	}
+	if len(permissions) != 2 {
+		t.Fatalf("expected template permissions, got %d", len(permissions))
+	}
+}
+
 func TestDisableRoleBlockedWhenAssigned(t *testing.T) {
 	repo := &stubRepository{}
 	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{NameMember: 2}})
