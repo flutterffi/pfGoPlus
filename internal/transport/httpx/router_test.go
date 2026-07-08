@@ -286,6 +286,25 @@ func TestAdminCanListRoles(t *testing.T) {
 	}
 }
 
+func TestAdminCanUpdateRole(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]any{
+		"display_name": "Platform Admin",
+		"permissions":  []string{"users:read", "users:write", "audit:read", "roles:read", "roles:write", "todos:read"},
+	})
+	request := httptest.NewRequest(http.MethodPatch, "/api/v1/roles/admin", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+}
+
 func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -327,7 +346,11 @@ func newTestRouter(t *testing.T) http.Handler {
 	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo, roleService)
 	authHandler := auth.NewHandler(authService)
-	roleHandler := role.NewHandler(roleService, auth.RequirePermission(authService, auth.PermissionRolesRead))
+	roleHandler := role.NewHandler(
+		roleService,
+		auth.RequirePermission(authService, auth.PermissionRolesRead),
+		auth.RequirePermission(authService, auth.PermissionRolesWrite),
+	)
 	auditHandler := audit.NewHandler(auditService, auth.RequirePermission(authService, auth.PermissionAuditRead))
 	userHandler := user.NewHandler(
 		userService,
@@ -428,7 +451,11 @@ func newMemberRouter(t *testing.T) http.Handler {
 	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo, roleService)
 	authHandler := auth.NewHandler(authService)
-	roleHandler := role.NewHandler(roleService, auth.RequirePermission(authService, auth.PermissionRolesRead))
+	roleHandler := role.NewHandler(
+		roleService,
+		auth.RequirePermission(authService, auth.PermissionRolesRead),
+		auth.RequirePermission(authService, auth.PermissionRolesWrite),
+	)
 	auditHandler := audit.NewHandler(auditService, auth.RequirePermission(authService, auth.PermissionAuditRead))
 	userHandler := user.NewHandler(
 		userService,
@@ -511,6 +538,16 @@ func newFakeRoleRepo() *fakeRoleRepo {
 func (f *fakeRoleRepo) Create(_ context.Context, item *role.Role) error {
 	item.ID = uint(len(f.items) + 1)
 	f.items = append(f.items, *item)
+	return nil
+}
+
+func (f *fakeRoleRepo) Update(_ context.Context, item *role.Role) error {
+	for i := range f.items {
+		if f.items[i].Name == item.Name {
+			f.items[i] = *item
+			return nil
+		}
+	}
 	return nil
 }
 

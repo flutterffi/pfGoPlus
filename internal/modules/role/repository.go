@@ -10,6 +10,7 @@ type Repository interface {
 	Create(ctx context.Context, item *Role) error
 	FindByName(ctx context.Context, name string) (*Role, error)
 	List(ctx context.Context) ([]Role, error)
+	Update(ctx context.Context, item *Role) error
 }
 
 type GormRepository struct {
@@ -40,4 +41,8 @@ func (r *GormRepository) List(ctx context.Context) ([]Role, error) {
 	var items []Role
 	err := r.db.WithContext(ctx).Order("id asc").Find(&items).Error
 	return items, err
+}
+
+func (r *GormRepository) Update(ctx context.Context, item *Role) error {
+	return r.db.WithContext(ctx).Save(item).Error
 }

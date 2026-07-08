@@ -5,6 +5,7 @@ const (
 	PermissionUsersWrite = "users:write"
 	PermissionAuditRead  = "audit:read"
 	PermissionRolesRead  = "roles:read"
+	PermissionRolesWrite = "roles:write"
 	PermissionTodosRead  = "todos:read"
 	PermissionTodosWrite = "todos:write"
 )

@@ -87,6 +87,7 @@ Open:
 - `GET /api/v1/audit/logs` (admin only)
   supports `actor_username`, `action`, `resource`, `status`, `trace_id`, `limit`, `offset`
 - `GET /api/v1/roles` (admin only)
+- `PATCH /api/v1/roles/:name` (admin only, update display name and permissions)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
 - Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
@@ -165,6 +166,7 @@ Current milestone:
 - role-to-permission authorization for admin and member APIs
 - audit log filtering and pagination
 - persisted role catalog with seeded permissions
+- role permission editing with admin safety guards
 
 Next milestone:
 

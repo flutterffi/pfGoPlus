@@ -3,6 +3,7 @@ package role
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 
 	"github.com/flutterffi/pfGoPlus/internal/transport/httpx"
@@ -23,12 +24,17 @@ type Seed struct {
 	Permissions []string
 }
 
+type UpdateRequest struct {
+	DisplayName *string  `json:"display_name"`
+	Permissions []string `json:"permissions"`
+}
+
 func DefaultSeeds() []Seed {
 	return []Seed{
 		{
 			Name:        NameAdmin,
 			DisplayName: "Administrator",
-			Permissions: []string{"users:read", "users:write", "audit:read", "roles:read", "todos:read", "todos:write"},
+			Permissions: []string{"users:read", "users:write", "audit:read", "roles:read", "roles:write", "todos:read", "todos:write"},
 		},
 		{
 			Name:        NameMember,
@@ -95,4 +101,67 @@ func (s *Service) List(ctx context.Context) ([]Role, error) {
 		return nil, httpx.Internal("list roles failed", err)
 	}
 	return items, nil
+}
+
+func (s *Service) Update(ctx context.Context, name string, req UpdateRequest) (*Role, error) {
+	item, err := s.repo.FindByName(ctx, strings.TrimSpace(name))
+	if err != nil {
+		return nil, httpx.Internal("load role failed", err)
+	}
+	if item == nil {
+		return nil, httpx.NotFound("role not found", nil)
+	}
+
+	if req.DisplayName != nil {
+		displayName := strings.TrimSpace(*req.DisplayName)
+		if displayName == "" {
+			return nil, httpx.BadRequest("display_name cannot be empty", nil)
+		}
+		item.DisplayName = displayName
+	}
+
+	if req.Permissions != nil {
+		permissions, validateErr := normalizePermissions(req.Permissions)
+		if validateErr != nil {
+			return nil, validateErr
+		}
+		if item.Name == NameAdmin {
+			for _, permission := range []string{"users:read", "users:write", "audit:read", "roles:read", "roles:write"} {
+				if !slices.Contains(permissions, permission) {
+					return nil, httpx.BadRequest("admin role must keep core management permissions", nil)
+				}
+			}
+		}
+		encoded, err := json.Marshal(permissions)
+		if err != nil {
+			return nil, httpx.Internal("encode role permissions failed", err)
+		}
+		item.Permissions = string(encoded)
+	}
+
+	if err := s.repo.Update(ctx, item); err != nil {
+		return nil, httpx.Internal("update role failed", err)
+	}
+	return item, nil
+}
+
+func normalizePermissions(values []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(values))
+	permissions := make([]string, 0, len(values))
+	for _, value := range values {
+		permission := strings.TrimSpace(value)
+		if permission == "" {
+			continue
+		}
+		if _, ok := seen[permission]; ok {
+			continue
+		}
+		seen[permission] = struct{}{}
+		permissions = append(permissions, permission)
+	}
+	if len(permissions) == 0 {
+		return nil, httpx.BadRequest("permissions cannot be empty", nil)
+	}
+	slices.Sort(permissions)
+	return permissions, nil
 }

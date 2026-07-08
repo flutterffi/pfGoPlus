@@ -31,6 +31,16 @@ func (s *stubRepository) List(_ context.Context) ([]Role, error) {
 	return items, nil
 }
 
+func (s *stubRepository) Update(_ context.Context, item *Role) error {
+	for i := range s.items {
+		if s.items[i].Name == item.Name {
+			s.items[i] = *item
+			return nil
+		}
+	}
+	return nil
+}
+
 func TestEnsureDefaultsSeedsRoles(t *testing.T) {
 	repo := &stubRepository{}
 	service := NewService(repo)
@@ -56,5 +66,40 @@ func TestResolvePermissions(t *testing.T) {
 	}
 	if len(permissions) == 0 {
 		t.Fatal("expected permissions")
+	}
+}
+
+func TestUpdateRolePermissions(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo)
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure defaults: %v", err)
+	}
+
+	displayName := "Platform Admin"
+	item, err := service.Update(context.Background(), NameAdmin, UpdateRequest{
+		DisplayName: &displayName,
+		Permissions: []string{"users:read", "users:write", "audit:read", "roles:read", "roles:write", "todos:read"},
+	})
+	if err != nil {
+		t.Fatalf("update role: %v", err)
+	}
+	if item.DisplayName != "Platform Admin" {
+		t.Fatalf("unexpected display name: %s", item.DisplayName)
+	}
+}
+
+func TestUpdateAdminRoleKeepsCorePermissions(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo)
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure defaults: %v", err)
+	}
+
+	_, err := service.Update(context.Background(), NameAdmin, UpdateRequest{
+		Permissions: []string{"todos:read"},
+	})
+	if err == nil {
+		t.Fatal("expected admin core permissions validation error")
 	}
 }

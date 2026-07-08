@@ -10,19 +10,21 @@ import (
 type Handler struct {
 	service *Service
 	readz   gin.HandlerFunc
+	writez  gin.HandlerFunc
 }
 
-func NewHandler(service *Service, readz gin.HandlerFunc) *Handler {
+func NewHandler(service *Service, readz gin.HandlerFunc, writez gin.HandlerFunc) *Handler {
 	return &Handler{
 		service: service,
 		readz:   readz,
+		writez:  writez,
 	}
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	roles := group.Group("/roles")
-	roles.Use(h.readz)
-	roles.GET("", h.List)
+	roles.GET("", h.readz, h.List)
+	roles.PATCH("/:name", h.writez, h.Update)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -46,4 +48,31 @@ func (h *Handler) List(c *gin.Context) {
 		})
 	}
 	httpx.OK(c, gin.H{"items": response})
+}
+
+func (h *Handler) Update(c *gin.Context) {
+	var req UpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(httpx.BadRequest("invalid request body", err))
+		return
+	}
+
+	item, err := h.service.Update(c.Request.Context(), c.Param("name"), req)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	var permissions []string
+	_ = json.Unmarshal([]byte(item.Permissions), &permissions)
+	httpx.OK(c, gin.H{
+		"role": gin.H{
+			"id":           item.ID,
+			"name":         item.Name,
+			"display_name": item.DisplayName,
+			"permissions":  permissions,
+			"created_at":   item.CreatedAt,
+			"updated_at":   item.UpdatedAt,
+		},
+	})
 }

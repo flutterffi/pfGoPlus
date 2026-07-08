@@ -37,7 +37,7 @@ func newTestService(t *testing.T) *Service {
 	}
 
 	roleRepo := &stubRoleRepo{items: []role.Role{
-		{Name: role.NameAdmin, Permissions: `["users:read","users:write","audit:read","roles:read","todos:read","todos:write"]`},
+		{Name: role.NameAdmin, Permissions: `["users:read","users:write","audit:read","roles:read","roles:write","todos:read","todos:write"]`},
 	}}
 
 	return NewService(config.AuthConfig{
@@ -59,6 +59,16 @@ type stubRoleRepo struct {
 }
 
 func (s *stubRoleRepo) Create(context.Context, *role.Role) error { return nil }
+
+func (s *stubRoleRepo) Update(_ context.Context, item *role.Role) error {
+	for i := range s.items {
+		if s.items[i].Name == item.Name {
+			s.items[i] = *item
+			return nil
+		}
+	}
+	return nil
+}
 
 func (s *stubRoleRepo) FindByName(_ context.Context, name string) (*role.Role, error) {
 	for i := range s.items {

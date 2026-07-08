@@ -93,7 +93,11 @@ func NewAuthHandler(service *auth.Service) *auth.Handler {
 }
 
 func NewRoleHandler(service *role.Service, authService *auth.Service) *role.Handler {
-	return role.NewHandler(service, auth.RequirePermission(authService, auth.PermissionRolesRead))
+	return role.NewHandler(
+		service,
+		auth.RequirePermission(authService, auth.PermissionRolesRead),
+		auth.RequirePermission(authService, auth.PermissionRolesWrite),
+	)
 }
 
 func NewAuditHandler(service *audit.Service, authService *auth.Service) *audit.Handler {
