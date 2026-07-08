@@ -61,6 +61,8 @@ type ObservabilityConfig struct {
 	Enabled        bool   `mapstructure:"enabled"`
 	Exporter       string `mapstructure:"exporter"`
 	MetricsPath    string `mapstructure:"metrics_path"`
+	OTLPEndpoint   string `mapstructure:"otlp_endpoint"`
+	OTLPInsecure   bool   `mapstructure:"otlp_insecure"`
 	ServiceVersion string `mapstructure:"service_version"`
 }
 
@@ -101,6 +103,8 @@ func Load() (Config, error) {
 	v.SetDefault("observability.enabled", true)
 	v.SetDefault("observability.exporter", "stdout")
 	v.SetDefault("observability.metrics_path", "/metrics")
+	v.SetDefault("observability.otlp_endpoint", "127.0.0.1:4317")
+	v.SetDefault("observability.otlp_insecure", true)
 	v.SetDefault("observability.service_version", "v0.3.0")
 	v.SetDefault("todo_backend.mode", "local")
 

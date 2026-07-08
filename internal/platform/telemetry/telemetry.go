@@ -9,6 +9,8 @@ import (
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	promexporter "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -35,7 +37,7 @@ func New(cfg config.ObservabilityConfig, serviceName, env string, log *zap.Logge
 		return NewNoop(serviceName), nil
 	}
 
-	traceExporter, metricReader, metricsHandler, err := newExporters(cfg.Exporter)
+	traceExporter, metricReader, metricsHandler, err := newExporters(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +129,8 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 	return p.tracerProvider.Shutdown(ctx)
 }
 
-func newExporters(name string) (sdktrace.SpanExporter, sdkmetric.Reader, http.Handler, error) {
-	switch strings.ToLower(strings.TrimSpace(name)) {
+func newExporters(cfg config.ObservabilityConfig) (sdktrace.SpanExporter, sdkmetric.Reader, http.Handler, error) {
+	switch strings.ToLower(strings.TrimSpace(cfg.Exporter)) {
 	case "", "stdout":
 		traceExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 		if err != nil {
@@ -149,7 +151,28 @@ func newExporters(name string) (sdktrace.SpanExporter, sdkmetric.Reader, http.Ha
 			return nil, nil, nil, fmt.Errorf("create prometheus exporter: %w", err)
 		}
 		return traceExporter, exporter, promhttp.Handler(), nil
+	case "otlp":
+		traceOptions := []otlptracegrpc.Option{
+			otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
+		}
+		metricOptions := []otlpmetricgrpc.Option{
+			otlpmetricgrpc.WithEndpoint(cfg.OTLPEndpoint),
+		}
+		if cfg.OTLPInsecure {
+			traceOptions = append(traceOptions, otlptracegrpc.WithInsecure())
+			metricOptions = append(metricOptions, otlpmetricgrpc.WithInsecure())
+		}
+
+		traceExporter, err := otlptracegrpc.New(context.Background(), traceOptions...)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("create otlp trace exporter: %w", err)
+		}
+		metricExporter, err := otlpmetricgrpc.New(context.Background(), metricOptions...)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("create otlp metric exporter: %w", err)
+		}
+		return traceExporter, sdkmetric.NewPeriodicReader(metricExporter), nil, nil
 	default:
-		return nil, nil, nil, fmt.Errorf("unsupported telemetry exporter: %s", name)
+		return nil, nil, nil, fmt.Errorf("unsupported telemetry exporter: %s", cfg.Exporter)
 	}
 }

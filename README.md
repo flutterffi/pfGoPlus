@@ -29,6 +29,12 @@ make run
 go run ./cmd/grpcserver
 ```
 
+Start the full local stack with OTLP collector and Prometheus:
+
+```bash
+make compose-up
+```
+
 Switch HTTP to gRPC-backed Todo mode:
 
 ```bash
@@ -45,6 +51,15 @@ PFGO_OBSERVABILITY_METRICS_PATH=/metrics \
 make run
 ```
 
+Export traces and metrics to an OTLP collector:
+
+```bash
+PFGO_OBSERVABILITY_EXPORTER=otlp \
+PFGO_OBSERVABILITY_OTLP_ENDPOINT=127.0.0.1:4317 \
+PFGO_OBSERVABILITY_OTLP_INSECURE=true \
+make run
+```
+
 Open:
 
 - `GET /health`
@@ -53,6 +68,7 @@ Open:
 - `POST /api/v1/todos` (requires Bearer token)
 - gRPC health service on `:9090`
 - gRPC `todo.v1.TodoService` with `ListTodos` and `CreateTodo`
+- Prometheus UI on `http://127.0.0.1:9091` when using `make compose-up`
 
 Example request:
 
@@ -89,8 +105,10 @@ pfGoPlus/
   internal/transport/grpcx/   # gRPC server and interceptors
   api/proto/todo/v1/          # proto contract and generated Go stubs
   docs/architecture.md        # microservice evolution notes
+  deployments/               # local observability stack configs
   tools/                      # build tool tracking
   Dockerfile                  # container image build
+  docker-compose.yml          # local multi-process stack
   .github/workflows/go.yml    # CI smoke test
 ```
 
@@ -114,10 +132,11 @@ Current milestone:
 - OpenTelemetry metrics pipeline
 - Prometheus scraping mode via `/metrics`
 - real Wire generation workflow via `make wire`
+- OTLP exporter support for traces and metrics
+- local Docker Compose stack with gRPC, OTEL Collector, and Prometheus
 
 Next milestone:
 
 - business protobuf contracts
-- generated Wire bootstrap
 - grpc-gateway or BFF-style edge transport
-- production exporter targets such as OTLP/Prometheus
+- richer service discovery and config layering

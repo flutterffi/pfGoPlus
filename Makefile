@@ -6,7 +6,7 @@ GOMODCACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.gomodcach
 BUF_CACHE_DIR := /Users/platojobs/Desktop/Github/flutterffi/pfGoPlus/.bufcache
 GO_RUN = GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) $(GO)
 
-.PHONY: run run-grpc test tidy proto wire wire-install
+.PHONY: run run-grpc test tidy proto wire wire-install compose-up compose-down compose-config
 
 run:
 	$(GO_RUN) run ./cmd/server
@@ -28,3 +28,12 @@ wire-install:
 
 wire:
 	GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) ./bin/wire ./internal/bootstrap
+
+compose-up:
+	docker compose up --build
+
+compose-down:
+	docker compose down --remove-orphans
+
+compose-config:
+	docker compose config
