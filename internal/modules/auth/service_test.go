@@ -62,6 +62,8 @@ type stubRoleRepo struct {
 
 func (s *stubRoleRepo) Create(context.Context, *role.Role) error { return nil }
 
+func (s *stubRoleRepo) Delete(context.Context, string) error { return nil }
+
 func (s *stubRoleRepo) Update(_ context.Context, item *role.Role) error {
 	for i := range s.items {
 		if s.items[i].Name == item.Name {

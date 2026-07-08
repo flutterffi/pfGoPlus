@@ -223,6 +223,35 @@ func (s *Service) Update(ctx context.Context, name string, req UpdateRequest) (*
 	return item, nil
 }
 
+func (s *Service) Delete(ctx context.Context, name string) error {
+	item, err := s.repo.FindByName(ctx, strings.TrimSpace(name))
+	if err != nil {
+		return httpx.Internal("load role failed", err)
+	}
+	if item == nil {
+		return httpx.NotFound("role not found", nil)
+	}
+	if item.Name == NameAdmin || item.Name == NameMember {
+		return httpx.BadRequest("system role cannot be deleted", nil)
+	}
+	if item.Status != StatusDisabled {
+		return httpx.BadRequest("role must be disabled before deletion", nil)
+	}
+	if s.roleCounter != nil {
+		count, err := s.roleCounter.CountByRole(ctx, item.Name)
+		if err != nil {
+			return httpx.Internal("count role usage failed", err)
+		}
+		if count > 0 {
+			return httpx.BadRequest("role is assigned to existing users", nil)
+		}
+	}
+	if err := s.repo.Delete(ctx, item.Name); err != nil {
+		return httpx.Internal("delete role failed", err)
+	}
+	return nil
+}
+
 func normalizePermissions(values []string) ([]string, error) {
 	seen := make(map[string]struct{}, len(values))
 	permissions := make([]string, 0, len(values))

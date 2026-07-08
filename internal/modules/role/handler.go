@@ -26,6 +26,7 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	roles.GET("", h.readz, h.List)
 	roles.POST("", h.writez, h.Create)
 	roles.PATCH("/:name", h.writez, h.Update)
+	roles.DELETE("/:name", h.writez, h.Delete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -44,6 +45,7 @@ func (h *Handler) List(c *gin.Context) {
 			"name":         item.Name,
 			"display_name": item.DisplayName,
 			"permissions":  permissions,
+			"status":       item.Status,
 			"created_at":   item.CreatedAt,
 			"updated_at":   item.UpdatedAt,
 		})
@@ -72,6 +74,7 @@ func (h *Handler) Update(c *gin.Context) {
 			"name":         item.Name,
 			"display_name": item.DisplayName,
 			"permissions":  permissions,
+			"status":       item.Status,
 			"created_at":   item.CreatedAt,
 			"updated_at":   item.UpdatedAt,
 		},
@@ -104,4 +107,13 @@ func (h *Handler) Create(c *gin.Context) {
 			"updated_at":   item.UpdatedAt,
 		},
 	})
+}
+
+func (h *Handler) Delete(c *gin.Context) {
+	if err := h.service.Delete(c.Request.Context(), c.Param("name")); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	httpx.OK(c, gin.H{"deleted": true})
 }

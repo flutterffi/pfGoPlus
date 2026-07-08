@@ -274,7 +274,8 @@ func TestAdminCanListRoles(t *testing.T) {
 	var response struct {
 		Data struct {
 			Items []struct {
-				Name string `json:"name"`
+				Name   string `json:"name"`
+				Status string `json:"status"`
 			} `json:"items"`
 		} `json:"data"`
 	}
@@ -283,6 +284,9 @@ func TestAdminCanListRoles(t *testing.T) {
 	}
 	if len(response.Data.Items) < 2 {
 		t.Fatalf("expected at least 2 roles, got %d", len(response.Data.Items))
+	}
+	if response.Data.Items[0].Status == "" {
+		t.Fatal("expected role status in list response")
 	}
 }
 
@@ -322,6 +326,44 @@ func TestAdminCanCreateRole(t *testing.T) {
 
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d", recorder.Code)
+	}
+}
+
+func TestAdminCanDeleteDisabledRole(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	body, _ := json.Marshal(map[string]any{
+		"name":         "auditor",
+		"display_name": "Auditor",
+		"permissions":  []string{"audit:read"},
+	})
+	createRequest := httptest.NewRequest(http.MethodPost, "/api/v1/roles", bytes.NewReader(body))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Authorization", "Bearer "+token)
+	createRecorder := httptest.NewRecorder()
+	router.ServeHTTP(createRecorder, createRequest)
+	if createRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected create status 201, got %d", createRecorder.Code)
+	}
+
+	disableBody, _ := json.Marshal(map[string]any{"status": "disabled"})
+	disableRequest := httptest.NewRequest(http.MethodPatch, "/api/v1/roles/auditor", bytes.NewReader(disableBody))
+	disableRequest.Header.Set("Content-Type", "application/json")
+	disableRequest.Header.Set("Authorization", "Bearer "+token)
+	disableRecorder := httptest.NewRecorder()
+	router.ServeHTTP(disableRecorder, disableRequest)
+	if disableRecorder.Code != http.StatusOK {
+		t.Fatalf("expected disable status 200, got %d", disableRecorder.Code)
+	}
+
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/api/v1/roles/auditor", nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+token)
+	deleteRecorder := httptest.NewRecorder()
+	router.ServeHTTP(deleteRecorder, deleteRequest)
+
+	if deleteRecorder.Code != http.StatusOK {
+		t.Fatalf("expected delete status 200, got %d", deleteRecorder.Code)
 	}
 }
 
@@ -571,6 +613,16 @@ func (f *fakeRoleRepo) Create(_ context.Context, item *role.Role) error {
 		item.Status = role.StatusActive
 	}
 	f.items = append(f.items, *item)
+	return nil
+}
+
+func (f *fakeRoleRepo) Delete(_ context.Context, name string) error {
+	for i := range f.items {
+		if f.items[i].Name == name {
+			f.items = append(f.items[:i], f.items[i+1:]...)
+			return nil
+		}
+	}
 	return nil
 }
 

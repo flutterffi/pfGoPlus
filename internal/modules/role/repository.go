@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	Create(ctx context.Context, item *Role) error
+	Delete(ctx context.Context, name string) error
 	FindByName(ctx context.Context, name string) (*Role, error)
 	List(ctx context.Context) ([]Role, error)
 	Update(ctx context.Context, item *Role) error
@@ -23,6 +24,10 @@ func NewRepository(db *gorm.DB) *GormRepository {
 
 func (r *GormRepository) Create(ctx context.Context, item *Role) error {
 	return r.db.WithContext(ctx).Create(item).Error
+}
+
+func (r *GormRepository) Delete(ctx context.Context, name string) error {
+	return r.db.WithContext(ctx).Where("name = ?", name).Delete(&Role{}).Error
 }
 
 func (r *GormRepository) FindByName(ctx context.Context, name string) (*Role, error) {

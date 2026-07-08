@@ -77,6 +77,16 @@ func (s *stubRoleRepo) Create(_ context.Context, item *role.Role) error {
 	return nil
 }
 
+func (s *stubRoleRepo) Delete(_ context.Context, name string) error {
+	for i := range s.items {
+		if s.items[i].Name == name {
+			s.items = append(s.items[:i], s.items[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}
+
 func (s *stubRoleRepo) Update(_ context.Context, item *role.Role) error {
 	for i := range s.items {
 		if s.items[i].Name == item.Name {

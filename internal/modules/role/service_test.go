@@ -19,6 +19,16 @@ func (s *stubRepository) Create(_ context.Context, item *Role) error {
 	return nil
 }
 
+func (s *stubRepository) Delete(_ context.Context, name string) error {
+	for i := range s.items {
+		if s.items[i].Name == name {
+			s.items = append(s.items[:i], s.items[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}
+
 func (s *stubRepository) FindByName(_ context.Context, name string) (*Role, error) {
 	for i := range s.items {
 		if s.items[i].Name == name {
@@ -140,5 +150,69 @@ func TestDisableRoleBlockedWhenAssigned(t *testing.T) {
 	_, err := service.Update(context.Background(), NameMember, UpdateRequest{Status: &status})
 	if err == nil {
 		t.Fatal("expected assigned role disable error")
+	}
+}
+
+func TestDeleteRoleSuccess(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure defaults: %v", err)
+	}
+	if _, err := service.Create(context.Background(), CreateRequest{
+		Name:        "auditor",
+		DisplayName: "Auditor",
+		Permissions: []string{"audit:read"},
+	}); err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+
+	status := StatusDisabled
+	if _, err := service.Update(context.Background(), "auditor", UpdateRequest{Status: &status}); err != nil {
+		t.Fatalf("disable role: %v", err)
+	}
+	if err := service.Delete(context.Background(), "auditor"); err != nil {
+		t.Fatalf("delete role: %v", err)
+	}
+
+	exists, err := service.RoleExists(context.Background(), "auditor")
+	if err != nil {
+		t.Fatalf("check role exists: %v", err)
+	}
+	if exists {
+		t.Fatal("expected deleted role to be removed")
+	}
+}
+
+func TestDeleteRoleRequiresDisabledStatus(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure defaults: %v", err)
+	}
+	if _, err := service.Create(context.Background(), CreateRequest{
+		Name:        "auditor",
+		DisplayName: "Auditor",
+		Permissions: []string{"audit:read"},
+	}); err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+
+	err := service.Delete(context.Background(), "auditor")
+	if err == nil {
+		t.Fatal("expected active role delete error")
+	}
+}
+
+func TestDeleteSystemRoleBlocked(t *testing.T) {
+	repo := &stubRepository{}
+	service := NewService(repo, &stubUsageCounter{counts: map[string]int64{}})
+	if err := service.EnsureDefaults(context.Background()); err != nil {
+		t.Fatalf("ensure defaults: %v", err)
+	}
+
+	err := service.Delete(context.Background(), NameAdmin)
+	if err == nil {
+		t.Fatal("expected system role delete error")
 	}
 }
