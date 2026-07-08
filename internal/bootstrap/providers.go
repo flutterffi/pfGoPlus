@@ -89,7 +89,7 @@ func NewAuthService(cfg config.Config, repo user.Repository, roles *role.Service
 }
 
 func NewAuthHandler(service *auth.Service) *auth.Handler {
-	return auth.NewHandler(service)
+	return auth.NewHandler(service, auth.RequirePermission(service, auth.PermissionRolesRead))
 }
 
 func NewRoleHandler(service *role.Service, authService *auth.Service) *role.Handler {

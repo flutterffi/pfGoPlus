@@ -9,15 +9,20 @@ import (
 
 type Handler struct {
 	service *Service
+	readz   gin.HandlerFunc
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, readz gin.HandlerFunc) *Handler {
+	return &Handler{
+		service: service,
+		readz:   readz,
+	}
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	authGroup := group.Group("/auth")
 	authGroup.POST("/login", h.Login)
+	authGroup.GET("/permissions", h.readz, h.ListPermissions)
 }
 
 func (h *Handler) Login(c *gin.Context) {
@@ -34,4 +39,8 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	httpx.Success(c, http.StatusOK, "login success", gin.H{"token": result})
+}
+
+func (h *Handler) ListPermissions(c *gin.Context) {
+	httpx.OK(c, gin.H{"items": Catalog()})
 }

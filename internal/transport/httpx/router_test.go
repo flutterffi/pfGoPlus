@@ -144,6 +144,38 @@ func TestCurrentUserEndpoint(t *testing.T) {
 	}
 }
 
+func TestAdminCanListPermissionCatalog(t *testing.T) {
+	router := newTestRouter(t)
+	token := loginToken(t, router)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/permissions", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	var response struct {
+		Data struct {
+			Items []struct {
+				Key   string `json:"key"`
+				Group string `json:"group"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal permission response: %v", err)
+	}
+	if len(response.Data.Items) == 0 {
+		t.Fatal("expected permission catalog items")
+	}
+	if response.Data.Items[0].Key == "" || response.Data.Items[0].Group == "" {
+		t.Fatal("expected key and group in permission catalog item")
+	}
+}
+
 func TestAdminCanCreateUser(t *testing.T) {
 	router := newTestRouter(t)
 	token := loginToken(t, router)
@@ -200,6 +232,20 @@ func TestMemberCannotListUsers(t *testing.T) {
 	token := loginTokenWithCredentials(t, router, "member", "member123")
 
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", recorder.Code)
+	}
+}
+
+func TestMemberCannotListPermissionCatalog(t *testing.T) {
+	router := newMemberRouter(t)
+	token := loginTokenWithCredentials(t, router, "member", "member123")
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/permissions", nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
@@ -407,7 +453,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	}
 	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo, roleService)
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, auth.RequirePermission(authService, auth.PermissionRolesRead))
 	roleHandler := role.NewHandler(
 		roleService,
 		auth.RequirePermission(authService, auth.PermissionRolesRead),
@@ -512,7 +558,7 @@ func newMemberRouter(t *testing.T) http.Handler {
 	}
 	auditService := audit.NewService(auditRepo)
 	authService := auth.NewService(cfg.Auth, userRepo, roleService)
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, auth.RequirePermission(authService, auth.PermissionRolesRead))
 	roleHandler := role.NewHandler(
 		roleService,
 		auth.RequirePermission(authService, auth.PermissionRolesRead),

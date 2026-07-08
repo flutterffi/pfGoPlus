@@ -78,6 +78,7 @@ Open:
 
 - `GET /health`
 - `POST /api/v1/auth/login`
+- `GET /api/v1/auth/permissions` (admin only, permission catalog metadata)
 - `GET /api/v1/todos` (requires Bearer token)
 - `POST /api/v1/todos` (requires Bearer token)
 - `GET /api/v1/users/me` (requires Bearer token)
@@ -171,6 +172,7 @@ Current milestone:
 - role permission editing with admin safety guards
 - role lifecycle management with create and disable protections
 - role deletion workflow with system-role and assignment safeguards
+- permission catalog metadata endpoint for frontend authorization management
 
 Next milestone:
 
