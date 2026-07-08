@@ -3,10 +3,11 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"io"
+	"net/http"
 	"strings"
 
 	todov1 "github.com/flutterffi/pfGoPlus/api/proto/todo/v1"
+	"github.com/flutterffi/pfGoPlus/internal/app"
 	"github.com/flutterffi/pfGoPlus/internal/bff"
 	"github.com/flutterffi/pfGoPlus/internal/config"
 	"github.com/flutterffi/pfGoPlus/internal/modules/auth"
@@ -28,6 +29,14 @@ func NewLogger(cfg config.Config) (*zap.Logger, error) {
 
 func NewDatabase(cfg config.Config, log *zap.Logger) (*gorm.DB, error) {
 	return database.New(cfg.Database, log)
+}
+
+func NewReadyDatabase(cfg config.Config, log *zap.Logger) (*gorm.DB, error) {
+	db, err := NewDatabase(cfg, log)
+	if err != nil {
+		return nil, err
+	}
+	return MigrateDatabase(cfg, db)
 }
 
 func NewTelemetry(cfg config.Config, log *zap.Logger) (*telemetry.Provider, error) {
@@ -52,7 +61,7 @@ func NewAuthHandler(service *auth.Service) *auth.Handler {
 	return auth.NewHandler(service)
 }
 
-func NewTodoRepository(db *gorm.DB) *todo.GormRepository {
+func NewTodoRepository(db *gorm.DB) todo.Repository {
 	return todo.NewRepository(db)
 }
 
@@ -68,20 +77,34 @@ func NewTodoGRPCService(service *todo.Service) todov1.TodoServiceServer {
 	return todo.NewGRPCService(service)
 }
 
-func NewTodoAPI(cfg config.Config, log *zap.Logger, service *todo.Service) (todo.API, io.Closer, error) {
+type TodoBackend struct {
+	API     todo.API
+	Cleanup app.Cleanup
+}
+
+func NewTodoBackend(cfg config.Config, log *zap.Logger, service *todo.Service) (*TodoBackend, error) {
 	switch strings.ToLower(strings.TrimSpace(cfg.TodoBackend.Mode)) {
 	case "", "local":
-		return service, nil, nil
+		return &TodoBackend{API: service}, nil
 	case "grpc":
 		conn, err := grpcx.Dial(context.Background(), cfg.GRPC.ClientTarget)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		log.Info("todo backend uses grpc client", zap.String("target", cfg.GRPC.ClientTarget))
-		return todo.NewGRPCClient(conn), conn, nil
+		return &TodoBackend{
+			API: todo.NewGRPCClient(conn),
+			Cleanup: func() {
+				_ = conn.Close()
+			},
+		}, nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported todo backend mode: %s", cfg.TodoBackend.Mode)
+		return nil, fmt.Errorf("unsupported todo backend mode: %s", cfg.TodoBackend.Mode)
 	}
+}
+
+func NewTodoAPI(backend *TodoBackend) todo.API {
+	return backend.API
 }
 
 func NewBFF(cfg config.Config, authHandler *auth.Handler, todoHandler *todo.Handler, telemetryProvider *telemetry.Provider) *bff.Edge {
@@ -90,6 +113,17 @@ func NewBFF(cfg config.Config, authHandler *auth.Handler, todoHandler *todo.Hand
 
 func NewHTTPRouter(log *zap.Logger, provider *telemetry.Provider, edge *bff.Edge) *gin.Engine {
 	return httpx.NewRouter(log, provider, edge)
+}
+
+func NewHTTPHandler(engine *gin.Engine) http.Handler {
+	return engine
+}
+
+func NewHTTPAppCleanups(backend *TodoBackend) []app.Cleanup {
+	if backend == nil || backend.Cleanup == nil {
+		return nil
+	}
+	return []app.Cleanup{backend.Cleanup}
 }
 
 func NewGRPCServer(log *zap.Logger, provider *telemetry.Provider, todoServer todov1.TodoServiceServer) *grpc.Server {

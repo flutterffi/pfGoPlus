@@ -24,6 +24,7 @@
 ```bash
 make tidy
 make proto
+make wire
 make run
 go run ./cmd/grpcserver
 ```
@@ -88,6 +89,7 @@ pfGoPlus/
   internal/transport/grpcx/   # gRPC server and interceptors
   api/proto/todo/v1/          # proto contract and generated Go stubs
   docs/architecture.md        # microservice evolution notes
+  tools/                      # build tool tracking
   Dockerfile                  # container image build
   .github/workflows/go.yml    # CI smoke test
 ```
@@ -111,6 +113,7 @@ Current milestone:
 - BFF-style HTTP adapter around Todo API
 - OpenTelemetry metrics pipeline
 - Prometheus scraping mode via `/metrics`
+- real Wire generation workflow via `make wire`
 
 Next milestone:
 

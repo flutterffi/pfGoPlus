@@ -1,4 +1,5 @@
 //go:build wireinject
+// +build wireinject
 
 package bootstrap
 
@@ -8,22 +9,25 @@ import (
 	"github.com/google/wire"
 )
 
+//go:generate ../../bin/wire
+
 func InitializeHTTPApp() (*app.HTTPApp, error) {
 	wire.Build(
 		config.Load,
 		NewLogger,
-		NewDatabase,
+		NewReadyDatabase,
 		NewTelemetry,
-		MigrateDatabase,
 		NewAuthService,
 		NewAuthHandler,
 		NewTodoRepository,
 		NewTodoService,
+		NewTodoBackend,
 		NewTodoAPI,
-		NewTodoGRPCService,
 		NewTodoHandler,
 		NewBFF,
 		NewHTTPRouter,
+		NewHTTPHandler,
+		NewHTTPAppCleanups,
 		app.NewHTTPApp,
 	)
 	return nil, nil
@@ -33,9 +37,8 @@ func InitializeGRPCApp() (*app.GRPCApp, error) {
 	wire.Build(
 		config.Load,
 		NewLogger,
-		NewDatabase,
+		NewReadyDatabase,
 		NewTelemetry,
-		MigrateDatabase,
 		NewTodoRepository,
 		NewTodoService,
 		NewTodoGRPCService,
